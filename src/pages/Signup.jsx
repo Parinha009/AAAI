@@ -4,6 +4,7 @@ export default function Signup({
   formData,
   message,
   onChange,
+  onGoToLanding,
   onSubmit,
   onSwitchToLogin,
   onTogglePassword,
@@ -16,6 +17,7 @@ export default function Signup({
       heroTitle="Track everything in your dashboard"
       logoAlt="AAAI Main logo"
       logoSrc="/logo.svg"
+      onLogoClick={onGoToLanding}
       onSwitchToLogin={onSwitchToLogin}
       onSwitchToSignup={() => {}}
     >

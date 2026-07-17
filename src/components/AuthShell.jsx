@@ -5,6 +5,7 @@ export default function AuthShell({
   heroTitle,
   logoAlt,
   logoSrc,
+  onLogoClick,
   onSwitchToLogin,
   onSwitchToSignup,
 }) {
@@ -12,7 +13,9 @@ export default function AuthShell({
     <main className="auth-page">
       <section className="auth-hero" aria-hidden="true">
         <div className="hero-copy">
-          <img className="brand-logo" src={logoSrc} alt={logoAlt} />
+          <button type="button" className="auth-logo-button" onClick={onLogoClick}>
+            <img className="brand-logo" src={logoSrc} alt={logoAlt} />
+          </button>
           <p>{heroSubtitle}</p>
           <h2>{heroTitle}</h2>
         </div>

@@ -85,6 +85,7 @@ export default function App() {
       message={message}
       onChange={handleChange}
       onForgetPassword={handleForgetPassword}
+      onGoToLanding={handleGoLanding}
       onSubmit={handleSubmit}
       onSwitchToSignup={() => resetState('signup')}
       onTogglePassword={() => setShowPassword((current) => !current)}
@@ -95,6 +96,7 @@ export default function App() {
       formData={formData}
       message={message}
       onChange={handleChange}
+      onGoToLanding={handleGoLanding}
       onSubmit={handleSubmit}
       onSwitchToLogin={() => resetState('login')}
       onTogglePassword={() => setShowPassword((current) => !current)}

@@ -1,12 +1,51 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 const sections = [
   { label: 'How it works?', target: 'how-it-works' },
   { label: 'Pricing', target: 'pricing' },
-  { label: 'Resources', target: 'resources' },
-  { label: 'Use Cases', target: 'use-cases' },
-  { label: 'Contact Us', target: 'contact-us' },
 ]
+
+const navSections = {
+  'how-it-works': {
+    label: 'How it works',
+    title: 'How it works',
+    description: 'Choose your role, sign in, and continue to the matching experience.',
+    items: ['Pick a role', 'Sign in or sign up', 'Continue to your dashboard'],
+  },
+  pricing: {
+    label: 'Pricing',
+    title: 'Pricing',
+    description: 'Start free and scale when you are ready.',
+    items: ['Free to start', 'Scale when needed', 'No hidden setup fees'],
+  },
+  resources: {
+    label: 'Resources',
+    title: 'Resources',
+    description: 'Guides, setup help, and support material live here.',
+    items: [
+      'Compare Flowmingo',
+      'Blog',
+      'FAQ - Help Centre',
+      'Careers',
+    ],
+  },
+  'use-cases': {
+    label: 'Use Cases',
+    title: 'Use Cases',
+    description: 'Recruiters, hiring teams, and candidates can all use the same flow.',
+    items: [
+      'For Candidates',
+      'View Sample Result',
+      'Take Demo Interview',
+    ],
+  },
+  'contact-us': {
+    label: 'Contact Us',
+    title: 'Contact Us',
+    description: 'Need help? Reach out and we can extend the flow for your team.',
+    items: ['Email support', 'Book a demo', 'Request onboarding help'],
+  },
+}
 
 const options = [
   {
@@ -27,6 +66,9 @@ export default function Landing({ onGoToLogin, onGoToSignup, onChooseCompany, on
   const [isModalOpen, setIsModalOpen] = useState(true)
   const [selectedRole, setSelectedRole] = useState('')
   const [statusMessage, setStatusMessage] = useState('')
+  const [activeSection, setActiveSection] = useState('')
+  const [lockedSection, setLockedSection] = useState('')
+  const landingHeaderRef = useRef(null)
 
   const handleSelect = (role) => {
     setSelectedRole(role)
@@ -48,37 +90,133 @@ export default function Landing({ onGoToLogin, onGoToSignup, onChooseCompany, on
     setStatusMessage('Modal closed.')
   }
 
-  const handleScroll = (target) => {
-    const element = document.getElementById(target)
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  const handleShowSection = (sectionKey) => {
+    if (!lockedSection) {
+      setActiveSection(sectionKey)
     }
   }
 
+  const handleLockSection = (sectionKey) => {
+    setActiveSection(sectionKey)
+    setLockedSection(sectionKey)
+  }
+
+  useEffect(() => {
+    const handlePointerDown = (event) => {
+      if (!landingHeaderRef.current) {
+        return
+      }
+
+      if (!landingHeaderRef.current.contains(event.target)) {
+        setActiveSection('')
+        setLockedSection('')
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+    }
+  }, [])
+
   return (
     <main className="landing-page">
-      <header className="landing-nav">
-        <div className="landing-brand">
-          <img src="/logo.svg" alt="AAAI Main logo" className="landing-logo" />
-          <span>TalentPulse</span>
-        </div>
-        <div className="landing-actions">
-          {sections.map((section) => (
-            <button key={section.target} type="button" className="nav-text-button" onClick={() => handleScroll(section.target)}>
-              {section.label}
-            </button>
-          ))}
-          <button type="button" className="nav-text-button" onClick={onGoToLogin}>
-            Login
+      <div
+        className="landing-header-area"
+        ref={landingHeaderRef}
+        onMouseLeave={() => {
+          if (!lockedSection) {
+            setActiveSection('')
+          }
+        }}
+      >
+        <header className="landing-nav">
+          <button
+            type="button"
+            className="landing-brand-button"
+            onClick={() => {
+              setActiveSection('')
+              setLockedSection('')
+              window.scrollTo({ top: 0, behavior: 'smooth' })
+            }}
+          >
+            <span className="landing-brand">
+              <img src="/logo.svg" alt="AAAI Main logo" className="landing-logo" />
+              <span>TalentPulse</span>
+            </span>
           </button>
-          <button type="button" className="nav-text-button" onClick={onGoToSignup}>
-            Sign Up
-          </button>
-          <button type="button" className="nav-start-button" onClick={() => setIsModalOpen(true)}>
-            Get Started →
-          </button>
-        </div>
-      </header>
+          <nav className="landing-actions" aria-label="Primary navigation">
+            <div className="landing-center-links">
+              {sections.map((section) => (
+                <button
+                  key={section.target}
+                  type="button"
+                  className={activeSection === section.target ? 'nav-text-button nav-dropdown-button active' : 'nav-text-button nav-dropdown-button'}
+                  aria-pressed={activeSection === section.target}
+                  onMouseEnter={() => handleShowSection(section.target)}
+                  onClick={() => handleLockSection(section.target)}
+                >
+                  {section.label}
+                </button>
+              ))}
+              <button
+                type="button"
+                className={activeSection === 'resources' ? 'nav-text-button nav-dropdown-button active' : 'nav-text-button nav-dropdown-button'}
+                aria-pressed={activeSection === 'resources'}
+                onMouseEnter={() => handleShowSection('resources')}
+                onClick={() => handleLockSection('resources')}
+              >
+                Resources
+              </button>
+              <button
+                type="button"
+                className={activeSection === 'use-cases' ? 'nav-text-button nav-dropdown-button active' : 'nav-text-button nav-dropdown-button'}
+                aria-pressed={activeSection === 'use-cases'}
+                onMouseEnter={() => handleShowSection('use-cases')}
+                onClick={() => handleLockSection('use-cases')}
+              >
+                Use Cases
+              </button>
+              <button
+                type="button"
+                className={activeSection === 'contact-us' ? 'nav-text-button nav-dropdown-button active' : 'nav-text-button nav-dropdown-button'}
+                aria-pressed={activeSection === 'contact-us'}
+                onMouseEnter={() => handleShowSection('contact-us')}
+                onClick={() => handleLockSection('contact-us')}
+              >
+                Contact Us
+              </button>
+            </div>
+            <div className="landing-auth-actions">
+              <button type="button" className="nav-text-button" onClick={onGoToLogin}>
+                Login
+              </button>
+              <button type="button" className="nav-text-button" onClick={onGoToSignup}>
+                Sign Up
+              </button>
+              <button type="button" className="nav-start-button" onClick={() => setIsModalOpen(true)}>
+                Get Started →
+              </button>
+            </div>
+          </nav>
+        </header>
+
+        {activeSection ? (
+          <section className="landing-section landing-dynamic-section" aria-live="polite">
+            <p className="landing-section-kicker">{navSections[activeSection].label}</p>
+            <h3>{navSections[activeSection].title}</h3>
+            <p>{navSections[activeSection].description}</p>
+            <div className="landing-section-grid">
+              {navSections[activeSection].items.map((item) => (
+                <article key={item} className="landing-section-card">
+                  {item}
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : null}
+      </div>
 
       <section className="landing-hero">
         <p className="landing-pill">Now powered by AI</p>
@@ -90,31 +228,6 @@ export default function Landing({ onGoToLogin, onGoToSignup, onChooseCompany, on
         <button type="button" className="primary-cta" onClick={() => setIsModalOpen(true)}>
           Get Started Free →
         </button>
-      </section>
-
-      <section id="how-it-works" className="landing-section">
-        <h3>How it works</h3>
-        <p>Choose your role, sign in, and continue to the matching experience.</p>
-      </section>
-
-      <section id="pricing" className="landing-section">
-        <h3>Pricing</h3>
-        <p>Start free and scale when you are ready.</p>
-      </section>
-
-      <section id="resources" className="landing-section">
-        <h3>Resources</h3>
-        <p>Guides, setup help, and support material live here.</p>
-      </section>
-
-      <section id="use-cases" className="landing-section">
-        <h3>Use Cases</h3>
-        <p>Recruiters, hiring teams, and candidates can all use the same flow.</p>
-      </section>
-
-      <section id="contact-us" className="landing-section">
-        <h3>Contact Us</h3>
-        <p>Need help? Reach out and we can extend the flow for your team.</p>
       </section>
 
       {isModalOpen ? <div className="landing-overlay" aria-hidden="true" /> : null}

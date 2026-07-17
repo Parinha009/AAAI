@@ -54,7 +54,8 @@ button {
 .landing-page {
   min-height: 100vh;
   position: relative;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   background:
     radial-gradient(circle at 20% 20%, rgba(47, 93, 230, 0.05), transparent 28%),
     linear-gradient(180deg, #fbfcff 0%, #f4f7fc 100%);
@@ -79,15 +80,27 @@ button {
   z-index: 1;
 }
 
+.landing-header-area {
+  position: relative;
+  z-index: 2;
+}
+
 .landing-nav {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
-  justify-content: space-between;
   gap: 20px;
   padding: 18px 32px;
   background: rgba(255, 255, 255, 0.96);
   backdrop-filter: blur(10px);
-  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.95);
+}
+
+.landing-brand-button {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: left;
 }
 
 .landing-brand {
@@ -108,9 +121,38 @@ button {
 }
 
 .landing-actions {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+}
+
+.landing-center-links,
+.landing-auth-actions {
   display: inline-flex;
   align-items: center;
   gap: 12px;
+  white-space: nowrap;
+}
+
+.landing-center-links {
+  justify-self: center;
+  justify-content: center;
+}
+
+.landing-auth-actions {
+  justify-self: end;
+}
+
+.nav-dropdown-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nav-dropdown-button.active {
+  color: #2f5de6;
 }
 
 .nav-text-button {
@@ -155,16 +197,76 @@ button {
 
 .landing-hero {
   min-height: calc(100vh - 88px);
-  display: grid;
-  place-items: center;
-  align-content: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
   text-align: center;
-  padding: 60px 20px 80px;
+  padding: 40px 20px 72px;
   filter: blur(0);
 }
 
+.landing-dynamic-section {
+  position: static;
+  width: min(92vw, 1120px);
+  margin: 0 auto 16px;
+  padding: 24px 26px 28px;
+  border-radius: 26px;
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  box-shadow: 0 22px 54px rgba(15, 23, 42, 0.08);
+}
+
+.landing-section-kicker {
+  margin: 0 0 10px;
+  font-size: var(--text-small);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #2f5de6;
+}
+
+.landing-dynamic-section h3,
+.landing-section h3 {
+  margin: 0;
+  font-size: clamp(1.5rem, 3vw, 2.2rem);
+  line-height: 1.05;
+  letter-spacing: -0.05em;
+  color: #111827;
+  font-weight: 900;
+}
+
+.landing-dynamic-section p,
+.landing-section p {
+  margin: 14px 0 0;
+  font-size: var(--text-body);
+  line-height: 1.55;
+  color: #5b6476;
+}
+
+.landing-section-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 22px;
+}
+
+.landing-section-card {
+  min-height: 104px;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(47, 93, 230, 0.06), rgba(47, 93, 230, 0.02));
+  border: 1px solid rgba(47, 93, 230, 0.1);
+  color: #172033;
+  font-weight: 700;
+  text-align: center;
+}
+
 .landing-pill {
-  margin: 0 0 14px;
+  margin: 0;
   display: inline-flex;
   align-items: center;
   padding: 9px 15px;
@@ -188,14 +290,14 @@ button {
 
 .landing-copy {
   max-width: 760px;
-  margin: 16px auto 0;
+  margin: 0;
   font-size: var(--text-body);
   line-height: 1.45;
   color: #5b6476;
 }
 
 .landing-hero h2 {
-  margin: 30px 0 0;
+  margin: 10px 0 0;
   font-size: clamp(1.4rem, 3vw, 2.1rem);
   line-height: 1;
   letter-spacing: -0.05em;
@@ -204,7 +306,7 @@ button {
 }
 
 .primary-cta {
-  margin-top: 24px;
+  margin-top: 8px;
   border: 0;
   border-radius: 18px;
   padding: 18px 34px;
@@ -465,6 +567,12 @@ button {
   gap: 14px;
 }
 
+.auth-logo-button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+
 .brand-logo {
   width: 76px;
   height: 76px;
@@ -678,6 +786,11 @@ button {
   }
 
   .landing-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .landing-actions {
     gap: 8px;
   }
 
@@ -687,6 +800,15 @@ button {
 
   .nav-start-button {
     padding: 10px 14px;
+  }
+
+  .landing-dynamic-section {
+    width: min(94vw, 1120px);
+    padding: 20px 18px 24px;
+  }
+
+  .landing-section-grid {
+    grid-template-columns: 1fr;
   }
 
   .ghost-button,

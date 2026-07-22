@@ -1,0 +1,24 @@
+{
+  "_comment": "Reference examples of the single error envelope (contract 3.1). One shape for every non-2xx.",
+  "401_invalid_token": {
+    "error": { "code": "INVALID_TOKEN", "message": "This sign-in link is invalid, expired, or already used.", "details": null }
+  },
+  "403_consent_required": {
+    "error": { "code": "CONSENT_REQUIRED", "message": "You must accept the consent notice before starting the interview.", "details": null }
+  },
+  "403_wrong_role": {
+    "error": { "code": "FORBIDDEN_ROLE", "message": "This account is not permitted to view the recruiter dashboard.", "details": null }
+  },
+  "413_payload_too_large": {
+    "error": { "code": "PAYLOAD_TOO_LARGE", "message": "Audio file exceeds the 20 MB limit.", "details": { "max_bytes": 20971520, "received_bytes": 23140000 } }
+  },
+  "415_unsupported_media": {
+    "error": { "code": "UNSUPPORTED_MEDIA_TYPE", "message": "Audio format not supported. Use webm, mp4, wav, or m4a.", "details": { "received": "audio/ogg" } }
+  },
+  "422_bad_consent": {
+    "error": { "code": "VALIDATION_ERROR", "message": "Consent must be explicitly agreed.", "details": { "field": "agreed", "expected": true } }
+  },
+  "429_budget_exceeded": {
+    "error": { "code": "BUDGET_EXCEEDED", "message": "AI processing is paused for this billing cycle.", "details": { "ceiling_usd": 10.00 } }
+  }
+}

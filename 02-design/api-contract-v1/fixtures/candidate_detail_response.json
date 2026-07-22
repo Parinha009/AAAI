@@ -1,0 +1,35 @@
+{
+  "candidate": { "candidate_id": 101, "name": "Dara Chen", "email": "dara@example.com", "status": "completed", "consent_at": "2026-07-06T09:46:10Z" },
+  "job": { "job_id": 1, "title": "Junior Backend Engineer" },
+  "responses": [
+    {
+      "response_id": 5001, "type": "base", "question_id": 1,
+      "question_text": "Tell us about a project where you had to debug a difficult problem. What was your approach?",
+      "transcript": "So the bug only showed up under load. I added logging around the request handler and found a race condition on the shared counter.",
+      "no_speech_flag": false,
+      "audio_url": "/api/v1/responses/5001/audio",
+      "created_at": "2026-07-06T09:47:02Z"
+    },
+    {
+      "response_id": 5004, "type": "follow_up", "question_id": 0,
+      "question_text": "You mentioned adding print statements to debug — how would you approach the same failure if it only happened in production and not locally?",
+      "transcript": "I would reproduce with production-like load in staging and add structured logging with request IDs before touching the code.",
+      "no_speech_flag": false,
+      "audio_url": "/api/v1/responses/5004/audio",
+      "created_at": "2026-07-06T09:52:40Z"
+    }
+  ],
+  "score": {
+    "technical_skill": 4, "communication": 5, "problem_solving": 4, "job_fit": 4,
+    "aggregate_score": 17,
+    "rationale": {
+      "technical_skill": "Explained a load-dependent race condition clearly.",
+      "communication": "Natural, specific phrasing; no templated structure detected.",
+      "problem_solving": "Described isolating the fault methodically.",
+      "job_fit": "Relevant backend experience for the role."
+    },
+    "manual_review_flag": false
+  },
+  "tab_out_count": 0,
+  "review_reasons": []
+}

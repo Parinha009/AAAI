@@ -1,0 +1,1 @@
+{ "response_id": 5001, "status": "transcribed", "transcript": "So the bug only showed up under load. I added logging around the request handler and found a race condition on the shared counter.", "no_speech_flag": false }

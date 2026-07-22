@@ -1,0 +1,24 @@
+{
+  "job_id": 1,
+  "title": "Junior Backend Engineer",
+  "candidates": [
+    {
+      "candidate_id": 101,
+      "name": "Dara Chen",
+      "aggregate_score": 17,
+      "scores": { "technical_skill": 4, "communication": 5, "problem_solving": 4, "job_fit": 4 },
+      "tab_out_count": 0,
+      "needs_review": false,
+      "review_reasons": []
+    },
+    {
+      "candidate_id": 102,
+      "name": "Sok Pisey",
+      "aggregate_score": 11,
+      "scores": { "technical_skill": 3, "communication": 2, "problem_solving": 3, "job_fit": 3 },
+      "tab_out_count": 4,
+      "needs_review": true,
+      "review_reasons": ["LOW_COMMUNICATION", "HIGH_TAB_OUT"]
+    }
+  ]
+}

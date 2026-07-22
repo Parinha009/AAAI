@@ -1,0 +1,10 @@
+{
+  "candidate_id": 101,
+  "events": [
+    { "log_id": 9001, "event_type": "CONSENT", "created_at": "2026-07-06T09:46:10Z", "payload": { "consent_version": "2026-07-01" } },
+    { "log_id": 9002, "event_type": "AI_REQUEST", "created_at": "2026-07-06T09:47:20Z", "payload": { "model": "whisper-1", "response_id": 5001 } },
+    { "log_id": 9003, "event_type": "AI_RESPONSE", "created_at": "2026-07-06T09:47:29Z", "payload": { "model": "whisper-1", "chars": 142 } },
+    { "log_id": 9004, "event_type": "TAB_OUT", "created_at": "2026-07-06T09:48:33Z", "payload": { "question_id": 2 } }
+  ]
+}
+

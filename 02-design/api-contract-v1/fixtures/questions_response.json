@@ -1,0 +1,8 @@
+{
+  "base_round_seconds": 300,
+  "questions": [
+    { "question_id": 1, "order": 1, "text": "Tell us about a project where you had to debug a difficult problem. What was your approach?" },
+    { "question_id": 2, "order": 2, "text": "How would you explain what an API is to a non-technical teammate?" },
+    { "question_id": 3, "order": 3, "text": "Describe a time you had to learn a new technology quickly." }
+  ]
+}

@@ -1,0 +1,56 @@
+erDiagram
+    JOBS ||--o{ CANDIDATES : has
+    JOBS ||--o{ RESPONSES : scopes
+    JOBS ||--o{ SCORES : scopes
+    JOBS ||--o{ AUDITLOGS : scopes
+    CANDIDATES ||--o{ RESPONSES : gives
+    CANDIDATES ||--|| SCORES : receives
+    CANDIDATES ||--o{ AUDITLOGS : generates
+
+    JOBS {
+        int job_id PK
+        string title
+        text rubric_config
+        text base_questions
+        timestamp created_at
+    }
+    CANDIDATES {
+        int candidate_id PK
+        int job_id FK
+        string name
+        string email
+        string consent_version
+        timestamp consent_at
+        string status
+    }
+    RESPONSES {
+        int response_id PK
+        int candidate_id FK
+        int job_id FK
+        int question_id
+        string type
+        string audio_path
+        text transcript
+        boolean no_speech_flag
+        timestamp created_at
+    }
+    SCORES {
+        int score_id PK
+        int candidate_id FK
+        int job_id FK
+        int technical_skill
+        int communication
+        int problem_solving
+        int job_fit
+        text rationale
+        boolean manual_review_flag
+        timestamp created_at
+    }
+    AUDITLOGS {
+        int log_id PK
+        int candidate_id FK
+        int job_id FK
+        string event_type
+        text payload
+        timestamp created_at
+    }

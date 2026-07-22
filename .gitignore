@@ -1,0 +1,83 @@
+# ─────────────────────────────────────────────────────────────
+# SECRETS — never commit these. (SRS-NFR-04)
+# A leaked OpenAI key can be used by strangers and billed to us.
+# ─────────────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+secrets.json
+
+# ─────────────────────────────────────────────────────────────
+# PERSONAL / LEAD-ONLY — never publish to the team repo.
+# Private management + coaching notes. Ignoring them here means
+# they stay on your computer but never reach GitHub, even with
+# `git add -A`. To share one later, delete its line below.
+# ─────────────────────────────────────────────────────────────
+# All my personal files now live in this one folder — ignoring it keeps them all out:
+_lead-private/
+
+# (kept as a safety net, in case a personal file is ever created outside that folder)
+LEAD_BRIEF.md
+AAAI_Tracker.md
+AAAI - Project Tracking Weekly.pdf
+AAAI_Week*_Restart_Tasks.md
+AAAI_Prompt-Log.md
+AAAI_Document_Brief_*.docx
+Claude Prompt.pdf
+AAAI_OPPM*
+Internship Schedule.txt
+
+# Local scratch folder (screenshots, personal notes) — not team work
+Github_Repo/
+
+# ── Python / FastAPI (backend) ──
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+
+# ── Node / React / Vite (frontend) ──
+node_modules/
+dist/
+build/
+.vite/
+npm-debug.log*
+yarn-error.log*
+
+# ── Candidate audio & uploads ──
+# Git is bad at large binary files. Audio lives on disk/object storage;
+# the database stores only the path (see `responses.audio_path`).
+media/
+uploads/
+*.webm
+*.mp4
+*.wav
+*.m4a
+*.mp3
+
+# ── Database ──
+*.sqlite3
+*.db
+*.dump
+
+# ── OS / editor noise ──
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# ── Logs ──
+*.log
+logs/
+
+# ── Local-only helper files (not for the team repo) ──
+# Github_Repo/ holds personal screenshots; the PUSH-* file is a how-to guide.
+Github_Repo/
+PUSH-AAAI-to-GitHub_step-by-step.md

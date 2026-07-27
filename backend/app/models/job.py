@@ -1,36 +1,27 @@
-"""Job — a role a candidate is invited to interview for.
-
-Holds the configuration authored by the Project Lead (SRS-2.6): base questions,
-scoring rubric prompt, and follow-up prompt. Treated as config, not runtime input.
-"""
+"""Job — one job opening with its questions & rubric (API Contract v1 §1)."""
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from sqlalchemy import String, Text, text
+from sqlalchemy import Integer, String, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
+from app.models.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
     from app.models.candidate import Candidate
 
 
-class Job(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+class Job(TimestampMixin, Base):
     __tablename__ = "jobs"
 
-    title: Mapped[str] = mapped_column(String(255), nullable=False)
-    description: Mapped[str | None] = mapped_column(Text)
-
-    # Prompts / rubric configuration (SRS-FR-03, FR-08).
-    rubric_prompt: Mapped[str | None] = mapped_column(Text)
-    follow_up_prompt: Mapped[str | None] = mapped_column(Text)
-
-    # Ordered list of 3–5 pre-seeded base questions (SRS-FR-05).
-    base_questions: Mapped[list] = mapped_column(
-        JSONB, nullable=False, server_default=text("'[]'::jsonb")
-    )
+    job_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    # 4-trait rubric + scoring anchors (Lead-authored). Shape locked, values pending.
+    rubric_config: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
+    # Ordered list of 3–5 base questions.
+    base_questions: Mapped[list] = mapped_column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))
 
     candidates: Mapped[list[Candidate]] = relationship(back_populates="job")

@@ -1,64 +1,40 @@
-"""Auth / session contract.
+"""Auth contract shapes (API Contract v1 §3.2)."""
 
-`dev-login` is a STUB standing in for the real email magic-link (SRS-FR-04),
-just enough to issue a candidate session so the interview flow can run.
-"""
-
-from uuid import UUID
+from datetime import datetime
 
 from pydantic import BaseModel, Field
 
 
-class DevLoginRequest(BaseModel):
-    job_id: UUID = Field(..., description="Job the candidate is interviewing for")
-    email: str = Field(..., description="Candidate email (identity for this stub)")
-    name: str | None = Field(None, description="Optional display name")
+class MagicLinkRequest(BaseModel):
+    email: str = Field(..., description="Email to send the sign-in link to")
 
 
-class SessionResponse(BaseModel):
-    access_token: str = Field(..., description="Signed session token — send as 'Authorization: Bearer <token>'")
-    token_type: str = "bearer"
-    candidate_id: UUID
-    job_id: UUID
-    role: str = "candidate"
-
-
-class SessionInfo(BaseModel):
-    candidate_id: UUID
-    job_id: UUID
-    role: str
-    email: str
-    status: str
-    consented: bool
-
-
-# --- Magic-link auth (SRS-FR-04) -----------------------------------------
-class RequestLinkRequest(BaseModel):
-    email: str = Field(..., description="Email on file (invited candidate or provisioned recruiter)")
-    role: str = Field("candidate", description="'candidate' or 'recruiter'")
-    job_id: UUID | None = Field(None, description="Required when role == 'candidate'")
-
-
-class RequestLinkResponse(BaseModel):
-    message: str
-    # Populated in development only, so the flow is testable without real email.
+class MagicLinkResponse(BaseModel):
+    status: str = "sent"
+    message: str = "If that email is registered, a sign-in link is on its way."
+    # Development-only helpers so the flow is testable without real email.
     dev_magic_link: str | None = None
     dev_token: str | None = None
 
 
 class VerifyRequest(BaseModel):
-    token: str = Field(..., description="The raw token from the magic link")
+    token: str
 
 
-class VerifiedSession(BaseModel):
-    access_token: str = Field(..., description="Signed session token — send as 'Authorization: Bearer <token>'")
-    token_type: str = "bearer"
+class SessionContext(BaseModel):
+    candidate_id: int | None = None
+    job_id: int | None = None
+
+
+class VerifyResponse(BaseModel):
+    session_token: str
     role: str
-    subject_id: UUID = Field(..., description="candidate_id or recruiter_id")
-    job_id: UUID | None = None
+    expires_at: datetime
+    context: SessionContext
 
 
-class RecruiterInfo(BaseModel):
-    recruiter_id: UUID
-    email: str
-    name: str | None
+class MeResponse(BaseModel):
+    role: str
+    candidate_id: int | None = None
+    job_id: int | None = None
+    candidate_status: str | None = None

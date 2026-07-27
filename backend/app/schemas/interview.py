@@ -1,68 +1,60 @@
-"""Interview flow contract: consent, base questions, and the async processing stub."""
+"""Interview contract shapes (API Contract v1 §3.3)."""
 
 from datetime import datetime
-from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 
-# --- Consent (SRS-FR-01) --------------------------------------------------
+# --- Consent (FR-01) ------------------------------------------------------
 class ConsentRequest(BaseModel):
-    consent: bool = Field(..., description="Must be true — affirmative agreement to be recorded and AI-evaluated")
+    consent_version: str = Field(..., description="Which consent text was agreed to")
+    agreed: bool = Field(..., description="Must be true")
 
 
 class ConsentResponse(BaseModel):
-    candidate_id: UUID
-    status: str
-    consent_version: str
-    consented_at: datetime
+    candidate_status: str
+    consent_at: datetime
 
 
-# --- Base questions (SRS-FR-05) ------------------------------------------
-class BaseQuestion(BaseModel):
-    index: int = Field(..., description="0-based position in the base round")
+# --- Base questions (FR-05) ----------------------------------------------
+class Question(BaseModel):
+    question_id: int
+    order: int
     text: str
 
 
-class QuestionSetResponse(BaseModel):
-    job_id: UUID
-    job_title: str
-    base_round_seconds: int = Field(..., description="Single global countdown for the whole base round (FR-05)")
-    questions: list[BaseQuestion]
+class QuestionsResponse(BaseModel):
+    base_round_seconds: int
+    questions: list[Question]
 
 
-# --- Audio responses (SRS-FR-06) -----------------------------------------
-class ResponseUploadResult(BaseModel):
-    response_id: UUID
-    response_type: str
-    question_index: int | None
-    audio_mime: str | None
-    audio_size_bytes: int
-    transcription_status: str = Field("pending", description="Queued for Whisper (FR-07)")
+# --- Response upload + poll (FR-02/06/07/17) -----------------------------
+class UploadResponse(BaseModel):
+    response_id: int
+    question_id: int
+    type: str
+    status: str = Field(..., description="uploaded | transcribing | transcribed | no_speech | failed")
 
 
-class ResponseItem(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: UUID
-    response_type: str
-    question_index: int | None
-    question_text: str | None
-    audio_mime: str | None
-    audio_size_bytes: int | None
-    transcript: str | None
-    no_speech: bool
-    created_at: datetime
+class ResponseStatus(BaseModel):
+    response_id: int
+    status: str
+    transcript: str | None = None
+    no_speech_flag: bool = False
 
 
-# --- Async processing stub (SRS-FR-17) -----------------------------------
-class ProcessingStartResponse(BaseModel):
-    task_id: str
-    state: str = Field(..., description="queued | processing | complete")
+# --- Tab-out (FR-12) ------------------------------------------------------
+class TabOutRequest(BaseModel):
+    question_id: int
+    occurred_at: datetime | None = None
 
 
-class ProcessingStatusResponse(BaseModel):
-    task_id: str
-    state: str = Field(..., description="queued | processing | complete")
-    elapsed_seconds: float
-    result: dict | None = Field(None, description="Populated once state == complete")
+class TabOutResponse(BaseModel):
+    status: str = "logged"
+
+
+# --- Screen-flow driver (FR-17) ------------------------------------------
+class InterviewStatusResponse(BaseModel):
+    candidate_status: str
+    stage: str = Field(..., description="consent | base | processing | follow_up | scoring | completed")
+    next_action: str

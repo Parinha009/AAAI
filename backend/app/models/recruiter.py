@@ -1,19 +1,18 @@
-"""Recruiter — a provisioned, trusted dashboard user (SRS-2.3).
-
-Recruiters are provisioned (not self-registered) and sign in via magic link
-(SRS-FR-04), same as candidates but role-scoped to the recruiter dashboard.
+"""Recruiter — provisioned dashboard user (backend-only helper, not in the shared
+contract). Recruiter identity is never exposed with an id in shared payloads.
 """
 
 from __future__ import annotations
 
-from sqlalchemy import String
+from sqlalchemy import Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
+from app.models.base import Base, TimestampMixin
 
 
-class Recruiter(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+class Recruiter(TimestampMixin, Base):
     __tablename__ = "recruiters"
 
-    email: Mapped[str] = mapped_column(String(320), nullable=False, unique=True)
-    name: Mapped[str | None] = mapped_column(String(255))
+    recruiter_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    email: Mapped[str] = mapped_column(String(254), nullable=False, unique=True)
+    name: Mapped[str | None] = mapped_column(String(150))

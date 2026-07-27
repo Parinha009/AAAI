@@ -1,58 +1,48 @@
-"""Response — one recorded answer (base or follow-up) and its transcript.
+"""Response — one recorded answer, base or follow-up (API Contract v1 §1).
 
-Stores only a *path/reference* to the audio artifact, not the blob itself
-(SRS-FR-06). Transcript is filled in asynchronously by Whisper (SRS-FR-07);
-`no_speech` flags empty/unintelligible audio rather than fabricating text.
+`question_id` = 0 means the follow-up. `status` is the transcription state machine
+the frontend polls. `audio_mime` is an internal column (not in shared shapes) kept
+only to set the playback Content-Type.
 """
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from uuid import UUID
 
-from sqlalchemy import BigInteger, Boolean, CheckConstraint, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
+from app.models.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
     from app.models.candidate import Candidate
 
 
-class Response(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+class Response(TimestampMixin, Base):
     __tablename__ = "responses"
     __table_args__ = (
+        CheckConstraint("type IN ('base','follow_up')", name="ck_responses_type"),
         CheckConstraint(
-            "response_type IN ('base','follow_up')",
-            name="ck_responses_type",
+            "status IN ('uploaded','transcribing','transcribed','no_speech','failed')",
+            name="ck_responses_status",
         ),
     )
 
-    candidate_id: Mapped[UUID] = mapped_column(
-        ForeignKey("candidates.id", name="fk_responses_candidate_id"),
+    response_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    candidate_id: Mapped[int] = mapped_column(
+        ForeignKey("candidates.candidate_id", name="fk_responses_candidate_id"),
         nullable=False,
         index=True,
     )
-    job_id: Mapped[UUID] = mapped_column(
-        ForeignKey("jobs.id", name="fk_responses_job_id"),
-        nullable=False,
-        index=True,
+    job_id: Mapped[int] = mapped_column(
+        ForeignKey("jobs.job_id", name="fk_responses_job_id"), nullable=False, index=True
     )
-
-    response_type: Mapped[str] = mapped_column(String(20), nullable=False)
-    # Position within the base round; NULL for the single follow-up.
-    question_index: Mapped[int | None] = mapped_column(Integer)
-    # Snapshot of the prompt shown (base text, or the AI-generated follow-up).
-    question_text: Mapped[str | None] = mapped_column(Text)
-
-    # Audio artifact (SRS-FR-06) — reference only.
-    audio_path: Mapped[str | None] = mapped_column(String(1024))
-    audio_mime: Mapped[str | None] = mapped_column(String(100))
-    audio_size_bytes: Mapped[int | None] = mapped_column(BigInteger)
-
-    # Transcription (SRS-FR-07).
+    question_id: Mapped[int] = mapped_column(Integer, nullable=False)  # 0 = follow-up
+    type: Mapped[str] = mapped_column(String(12), nullable=False)
+    status: Mapped[str] = mapped_column(String(12), nullable=False, server_default="uploaded")
+    audio_path: Mapped[str | None] = mapped_column(String(500))
+    audio_mime: Mapped[str | None] = mapped_column(String(100))  # internal (playback header)
     transcript: Mapped[str | None] = mapped_column(Text)
-    no_speech: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
-    detected_language: Mapped[str | None] = mapped_column(String(20))
+    no_speech_flag: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
 
     candidate: Mapped[Candidate] = relationship(back_populates="responses")

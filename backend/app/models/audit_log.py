@@ -1,58 +1,44 @@
-"""AuditLog — append-only trail of AI calls and anti-cheat events.
+"""AuditLog — append-only history (API Contract v1 §1; FR-13 / NFR-01).
 
-Every AI request/response pair and every anti-cheat event (e.g. TAB_OUT) is a new
-row here, foreign-keyed to Candidate and Job (SRS-FR-13, SRS-NFR-01).
-
-IMMUTABILITY IS ENFORCED AT THE DATABASE LEVEL. A BEFORE UPDATE/DELETE/TRUNCATE
-trigger (see the initial Alembic migration) raises an exception, so no code path
-— application or ad-hoc SQL — can alter or remove a persisted row. `seq` is a
-monotonic identity column giving a strict chronological ordering.
+Immutability is enforced at the DATABASE level: BEFORE UPDATE/DELETE/TRUNCATE
+triggers (see the initial migration) reject any mutation. Chronological order
+comes from the SERIAL log_id.
 """
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from uuid import UUID
 
-from sqlalchemy import BigInteger, CheckConstraint, ForeignKey, Identity, Index, String
+from sqlalchemy import CheckConstraint, ForeignKey, Index, Integer, String
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
+from app.models.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
     from app.models.candidate import Candidate
 
-_EVENT_TYPES = ("AI_REQUEST", "AI_RESPONSE", "TAB_OUT", "CONSENT", "PASTE_BLOCKED")
 
-
-class AuditLog(UUIDPrimaryKeyMixin, TimestampMixin, Base):
-    __tablename__ = "audit_logs"
+class AuditLog(TimestampMixin, Base):
+    __tablename__ = "auditlogs"
     __table_args__ = (
         CheckConstraint(
-            "event_type IN ('AI_REQUEST','AI_RESPONSE','TAB_OUT','CONSENT','PASTE_BLOCKED')",
-            name="ck_audit_logs_event_type",
+            "event_type IN ('CONSENT','AI_REQUEST','AI_RESPONSE','TAB_OUT','BUDGET_FREEZE')",
+            name="ck_auditlogs_event_type",
         ),
-        Index("ix_audit_logs_candidate_created", "candidate_id", "created_at"),
+        Index("ix_auditlogs_candidate_created", "candidate_id", "created_at"),
     )
 
-    # Strict chronological ordering, independent of clock resolution.
-    seq: Mapped[int] = mapped_column(BigInteger, Identity(always=True), nullable=False, unique=True)
-
-    candidate_id: Mapped[UUID] = mapped_column(
-        ForeignKey("candidates.id", name="fk_audit_logs_candidate_id"),
+    log_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    candidate_id: Mapped[int] = mapped_column(
+        ForeignKey("candidates.candidate_id", name="fk_auditlogs_candidate_id"),
         nullable=False,
     )
-    job_id: Mapped[UUID] = mapped_column(
-        ForeignKey("jobs.id", name="fk_audit_logs_job_id"),
-        nullable=False,
+    job_id: Mapped[int] = mapped_column(
+        ForeignKey("jobs.job_id", name="fk_auditlogs_job_id"), nullable=False
     )
-
-    event_type: Mapped[str] = mapped_column(String(30), nullable=False)
-
-    # Verbatim payloads (SRS-NFR-01: stored raw, not summarized).
-    request_payload: Mapped[dict | None] = mapped_column(JSONB)
-    response_payload: Mapped[dict | None] = mapped_column(JSONB)
-    event_data: Mapped[dict | None] = mapped_column(JSONB)
+    event_type: Mapped[str] = mapped_column(String(24), nullable=False)
+    # Raw AI request/response or event data, stored verbatim (NFR-01).
+    payload: Mapped[dict | None] = mapped_column(JSONB)
 
     candidate: Mapped[Candidate] = relationship(back_populates="audit_logs")

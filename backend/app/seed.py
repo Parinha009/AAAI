@@ -1,16 +1,15 @@
-"""Seed a demo Job so the interview flow has questions to fetch.
-
-Idempotent — run as many times as you like:
+"""Seed demo data so the interview flow can run. Idempotent.
 
     python -m app.seed
 
-Prints the demo Job's id, which the frontend (or /docs) uses to dev-login.
+Prints the demo JOB_ID plus the candidate/recruiter emails to request links for.
 """
 
 from app.database import SessionLocal
-from app.models import Job, Recruiter
+from app.models import Candidate, Job, Recruiter
 
 DEMO_TITLE = "Demo — Backend Engineer"
+DEMO_CANDIDATE_EMAIL = "candidate@demo.local"
 DEMO_RECRUITER_EMAIL = "recruiter@demo.local"
 
 DEMO_QUESTIONS = [
@@ -20,14 +19,11 @@ DEMO_QUESTIONS = [
     "Describe a bug you debugged recently and how you found the root cause.",
 ]
 
-RUBRIC_PROMPT = (
-    "Score the candidate 1-5 on Technical Skill, Communication, Problem Solving, and "
-    "Job Fit for a junior backend engineer role. Return strict JSON."
-)
-FOLLOW_UP_PROMPT = (
-    "Ask exactly one specific, technical follow-up question grounded in the candidate's "
-    "base answers. Plain text only."
-)
+DEMO_RUBRIC = {
+    "traits": ["technical_skill", "communication", "problem_solving", "job_fit"],
+    "scale": {"min": 1, "max": 5},
+    "notes": "Placeholder rubric — Lead authors final anchors in Week 4.",
+}
 
 
 def main() -> None:
@@ -35,20 +31,31 @@ def main() -> None:
     try:
         job = db.query(Job).filter(Job.title == DEMO_TITLE).first()
         if job is None:
-            job = Job(
-                title=DEMO_TITLE,
-                description="Auto-seeded demo job for local development.",
-                base_questions=DEMO_QUESTIONS,
-                rubric_prompt=RUBRIC_PROMPT,
-                follow_up_prompt=FOLLOW_UP_PROMPT,
-            )
+            job = Job(title=DEMO_TITLE, rubric_config=DEMO_RUBRIC, base_questions=DEMO_QUESTIONS)
             db.add(job)
             db.commit()
             db.refresh(job)
             print("Created demo job.")
         else:
             print("Demo job already exists.")
-        print(f"JOB_ID: {job.id}")
+        print(f"JOB_ID: {job.job_id}")
+
+        candidate = (
+            db.query(Candidate)
+            .filter(Candidate.email == DEMO_CANDIDATE_EMAIL, Candidate.job_id == job.job_id)
+            .first()
+        )
+        if candidate is None:
+            candidate = Candidate(
+                job_id=job.job_id, email=DEMO_CANDIDATE_EMAIL, name="Demo Candidate", status="invited"
+            )
+            db.add(candidate)
+            db.commit()
+            db.refresh(candidate)
+            print("Created demo candidate.")
+        else:
+            print("Demo candidate already exists.")
+        print(f"CANDIDATE_EMAIL: {candidate.email}")
 
         recruiter = db.query(Recruiter).filter(Recruiter.email == DEMO_RECRUITER_EMAIL).first()
         if recruiter is None:

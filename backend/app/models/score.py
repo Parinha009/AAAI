@@ -1,20 +1,14 @@
-"""Score — the structured, schema-validated scorecard for a candidate session.
-
-Four traits, each 1–5 with a rationale (SRS-FR-03). `raw_scorecard` keeps the
-exact validated JSON returned by GPT-4o-mini. `needs_review` drives the
-human-in-the-loop flag (SRS-FR-15). One scorecard per candidate.
-"""
+"""Score — one scorecard per candidate (API Contract v1 §1)."""
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from uuid import UUID
 
-from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Integer, Text
+from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Integer
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
+from app.models.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
     from app.models.candidate import Candidate
@@ -22,39 +16,27 @@ if TYPE_CHECKING:
 _TRAITS = ("technical_skill", "communication", "problem_solving", "job_fit")
 
 
-class Score(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+class Score(TimestampMixin, Base):
     __tablename__ = "scores"
     __table_args__ = tuple(
-        CheckConstraint(f"{trait} BETWEEN 1 AND 5", name=f"ck_scores_{trait}_range")
-        for trait in _TRAITS
+        CheckConstraint(f"{t} BETWEEN 1 AND 5", name=f"ck_scores_{t}_range") for t in _TRAITS
     )
 
-    candidate_id: Mapped[UUID] = mapped_column(
-        ForeignKey("candidates.id", name="fk_scores_candidate_id"),
+    score_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    candidate_id: Mapped[int] = mapped_column(
+        ForeignKey("candidates.candidate_id", name="fk_scores_candidate_id"),
         nullable=False,
-        unique=True,  # one scorecard per candidate session
+        unique=True,  # one scorecard per candidate
     )
-    job_id: Mapped[UUID] = mapped_column(
-        ForeignKey("jobs.id", name="fk_scores_job_id"),
-        nullable=False,
-        index=True,
+    job_id: Mapped[int] = mapped_column(
+        ForeignKey("jobs.job_id", name="fk_scores_job_id"), nullable=False, index=True
     )
-
     technical_skill: Mapped[int] = mapped_column(Integer, nullable=False)
     communication: Mapped[int] = mapped_column(Integer, nullable=False)
     problem_solving: Mapped[int] = mapped_column(Integer, nullable=False)
     job_fit: Mapped[int] = mapped_column(Integer, nullable=False)
-
-    technical_rationale: Mapped[str | None] = mapped_column(Text)
-    communication_rationale: Mapped[str | None] = mapped_column(Text)
-    problem_solving_rationale: Mapped[str | None] = mapped_column(Text)
-    job_fit_rationale: Mapped[str | None] = mapped_column(Text)
-
-    # Human-in-the-loop (SRS-FR-15).
-    needs_review: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
-    review_reason: Mapped[str | None] = mapped_column(Text)
-
-    # Verbatim validated JSON payload from GPT-4o-mini (SRS-FR-03).
-    raw_scorecard: Mapped[dict | None] = mapped_column(JSONB)
+    # { "<trait>": "<why>" } — includes any robotic-language trigger (FR-10).
+    rationale: Mapped[dict | None] = mapped_column(JSONB)
+    manual_review_flag: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
 
     candidate: Mapped[Candidate] = relationship(back_populates="score")

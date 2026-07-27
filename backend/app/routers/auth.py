@@ -1,73 +1,58 @@
-"""Auth routes — a stub session issuer for the vertical slice.
-
-`POST /api/auth/dev-login` stands in for the real email magic-link (SRS-FR-04):
-given a job + email it finds-or-creates the candidate and returns a signed
-session token. Swap this for real magic-link issuance in a later slice.
-"""
+"""Auth routes (API Contract v1 §3.2) — passwordless magic-link (FR-04)."""
 
 import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
 from app.email import send_magic_link
-from app.models import Candidate, Job, MagicLinkToken, Recruiter
+from app.errors import api_error
+from app.models import Candidate, MagicLinkToken, Recruiter
 from app.schemas.auth import (
-    DevLoginRequest,
-    RequestLinkRequest,
-    RequestLinkResponse,
-    SessionInfo,
-    SessionResponse,
-    VerifiedSession,
+    MagicLinkRequest,
+    MagicLinkResponse,
+    MeResponse,
+    SessionContext,
     VerifyRequest,
+    VerifyResponse,
 )
-from app.security import create_session_token, get_current_candidate
+from app.security import create_session_token, get_session, session_expires_at
 
-router = APIRouter(prefix="/api/auth", tags=["auth"])
+router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-def _hash_token(raw: str) -> str:
+def _hash(raw: str) -> str:
     return hashlib.sha256(raw.encode()).hexdigest()
 
 
 @router.post(
-    "/request-link",
-    response_model=RequestLinkResponse,
+    "/magic-link",
+    response_model=MagicLinkResponse,
+    response_model_exclude_none=True,  # hide dev_* helpers in production
+    status_code=status.HTTP_202_ACCEPTED,
     summary="Request a passwordless sign-in link (FR-04)",
 )
-def request_link(payload: RequestLinkRequest, db: Session = Depends(get_db)) -> RequestLinkResponse:
-    if payload.role not in ("candidate", "recruiter"):
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "role must be 'candidate' or 'recruiter'")
+def magic_link(payload: MagicLinkRequest, db: Session = Depends(get_db)) -> MagicLinkResponse:
+    # Resolve the subject by email: recruiter first, else invited candidate.
+    recruiter = db.query(Recruiter).filter(Recruiter.email == payload.email).first()
+    candidate = None
+    if recruiter is None:
+        candidate = db.query(Candidate).filter(Candidate.email == payload.email).first()
 
-    candidate = recruiter = None
-    if payload.role == "candidate":
-        if payload.job_id is None:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "job_id is required for candidate links")
-        candidate = (
-            db.query(Candidate)
-            .filter(Candidate.job_id == payload.job_id, Candidate.email == payload.email)
-            .first()
-        )
-    else:
-        recruiter = db.query(Recruiter).filter(Recruiter.email == payload.email).first()
+    resp = MagicLinkResponse()  # generic — never reveals whether the email exists
 
-    # Generic response either way — don't reveal whether the account exists.
-    resp = RequestLinkResponse(message="If that account exists, a sign-in link has been sent.")
-
-    subject = candidate or recruiter
+    subject = recruiter or candidate
     if subject is not None:
         raw = secrets.token_urlsafe(32)
         token = MagicLinkToken(
-            token_hash=_hash_token(raw),
+            token_hash=_hash(raw),
             email=payload.email,
-            role=payload.role,
-            job_id=payload.job_id if payload.role == "candidate" else None,
-            candidate_id=candidate.id if candidate else None,
-            recruiter_id=recruiter.id if recruiter else None,
+            role="recruiter" if recruiter else "candidate",
+            job_id=candidate.job_id if candidate else None,
             expires_at=datetime.now(timezone.utc)
             + timedelta(seconds=settings.magic_link_ttl_seconds),
         )
@@ -85,69 +70,61 @@ def request_link(payload: RequestLinkRequest, db: Session = Depends(get_db)) -> 
 
 @router.post(
     "/verify",
-    response_model=VerifiedSession,
-    summary="Exchange a magic-link token for a session (FR-04)",
+    response_model=VerifyResponse,
+    response_model_exclude_none=True,  # recruiter context omits candidate_id (FR-04)
+    summary="Trade a link token for a session (FR-04)",
 )
-def verify_link(payload: VerifyRequest, db: Session = Depends(get_db)) -> VerifiedSession:
+def verify(payload: VerifyRequest, db: Session = Depends(get_db)) -> VerifyResponse:
     token = (
-        db.query(MagicLinkToken)
-        .filter(MagicLinkToken.token_hash == _hash_token(payload.token))
-        .first()
+        db.query(MagicLinkToken).filter(MagicLinkToken.token_hash == _hash(payload.token)).first()
     )
-    if token is None:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid sign-in link")
-    if token.consumed_at is not None:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "This sign-in link has already been used")
-    if token.expires_at < datetime.now(timezone.utc):
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "This sign-in link has expired")
+    if token is None or token.consumed_at is not None or token.expires_at < datetime.now(timezone.utc):
+        # One 401 for invalid / used / expired — don't leak which (FR-04).
+        raise api_error(401, "UNAUTHORIZED", "Invalid, expired, or already-used sign-in link")
 
-    # Single-use: consume before issuing the session (FR-04 step 5).
-    token.consumed_at = datetime.now(timezone.utc)
+    token.consumed_at = datetime.now(timezone.utc)  # single-use (FR-04 step 5)
 
     if token.role == "candidate":
-        subject_id, job_id = token.candidate_id, token.job_id
-    else:
-        subject_id, job_id = token.recruiter_id, None
-
-    access = create_session_token(subject_id, job_id, role=token.role)
-    db.commit()
-
-    return VerifiedSession(access_token=access, role=token.role, subject_id=subject_id, job_id=job_id)
-
-
-@router.post("/dev-login", response_model=SessionResponse, summary="Dev login (stub for magic-link, FR-04)")
-def dev_login(payload: DevLoginRequest, db: Session = Depends(get_db)) -> SessionResponse:
-    job = db.get(Job, payload.job_id)
-    if job is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Job not found")
-
-    candidate = (
-        db.query(Candidate)
-        .filter(Candidate.job_id == payload.job_id, Candidate.email == payload.email)
-        .first()
-    )
-    if candidate is None:
-        candidate = Candidate(
-            job_id=payload.job_id,
-            email=payload.email,
-            name=payload.name,
-            status="invited",
+        candidate = (
+            db.query(Candidate)
+            .filter(Candidate.email == token.email, Candidate.job_id == token.job_id)
+            .first()
         )
-        db.add(candidate)
-        db.commit()
-        db.refresh(candidate)
+        if candidate is None:
+            raise api_error(401, "UNAUTHORIZED", "Invalid sign-in link")
+        session = create_session_token(role="candidate", subject_id=candidate.candidate_id, job_id=candidate.job_id)
+        context = SessionContext(candidate_id=candidate.candidate_id, job_id=candidate.job_id)
+    else:
+        recruiter = db.query(Recruiter).filter(Recruiter.email == token.email).first()
+        if recruiter is None:
+            raise api_error(401, "UNAUTHORIZED", "Invalid sign-in link")
+        session = create_session_token(role="recruiter", subject_id=recruiter.recruiter_id)
+        context = SessionContext()
 
-    token = create_session_token(candidate.id, candidate.job_id)
-    return SessionResponse(access_token=token, candidate_id=candidate.id, job_id=candidate.job_id)
-
-
-@router.get("/me", response_model=SessionInfo, summary="Current session info")
-def me(candidate: Candidate = Depends(get_current_candidate)) -> SessionInfo:
-    return SessionInfo(
-        candidate_id=candidate.id,
-        job_id=candidate.job_id,
-        role="candidate",
-        email=candidate.email,
-        status=candidate.status,
-        consented=candidate.consent_at is not None,
+    db.commit()
+    return VerifyResponse(
+        session_token=session, role=token.role, expires_at=session_expires_at(), context=context
     )
+
+
+@router.get(
+    "/me",
+    response_model=MeResponse,
+    response_model_exclude_none=True,  # recruiter /me omits candidate-only fields
+    summary="Who am I? (after page reload)",
+)
+def me(session: dict = Depends(get_session), db: Session = Depends(get_db)) -> MeResponse:
+    role = session.get("role")
+    if role == "candidate":
+        candidate = db.get(Candidate, int(session["sub"]))
+        if candidate is None:
+            raise api_error(401, "UNAUTHORIZED", "Candidate not found")
+        return MeResponse(
+            role="candidate",
+            candidate_id=candidate.candidate_id,
+            job_id=candidate.job_id,
+            candidate_status=candidate.status,
+        )
+    if role == "recruiter":
+        return MeResponse(role="recruiter")
+    raise api_error(401, "UNAUTHORIZED", "Unknown session role")

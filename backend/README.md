@@ -42,7 +42,7 @@ alembic upgrade head
 uvicorn app.main:app --reload
 ```
 
-Health checks: `GET /health` and `GET /health/db`.
+Health checks: `GET /api/v1/health` and `GET /api/v1/health/db`.
 
 > **Port note:** the container publishes Postgres on host port **5433** (not 5432)
 > to avoid clashing with a native Postgres install. The URL in `.env` already
@@ -56,39 +56,43 @@ alembic downgrade base    # roll back to empty
 alembic revision -m "..." # new migration (autogenerate off by default)
 ```
 
-## API routes (candidate flow slice)
+## API routes — aligned to **API Contract v1**
 
-Seed a demo job first so there are questions to fetch:
+All routes are under **`/api/v1`**. Every non-2xx response uses the standard
+envelope `{ "error": { "code", "message", "details" } }`. Seed demo data first:
 
 ```bash
-python -m app.seed          # prints JOB_ID
+python -m app.seed   # prints JOB_ID (int), CANDIDATE_EMAIL, RECRUITER_EMAIL
 ```
 
 | Method | Route | Purpose | Auth |
 |--------|-------|---------|------|
-| POST | `/api/auth/request-link` | Request a passwordless sign-in link (FR-04) | — |
-| POST | `/api/auth/verify` | Exchange a single-use link token for a role-scoped session (FR-04) | — |
-| POST | `/api/auth/dev-login` | **Dev-only** shortcut that skips email (invite/testing helper) | — |
-| GET | `/api/auth/me` | Current candidate session info | Bearer (candidate) |
-| GET | `/api/recruiter/me` | Current recruiter session info | Bearer (recruiter) |
-| POST | `/api/interview/consent` | Log consent (FR-01); appends a CONSENT audit row | Bearer |
-| GET | `/api/interview/questions` | Ordered base questions + 5:00 timer (FR-05); **403 until consent** | Bearer + consent |
-| POST | `/api/interview/responses` | Upload a recorded answer — 20 MB cap, type allow-list (FR-06) | Bearer + consent |
-| GET | `/api/interview/responses` | List the candidate's responses | Bearer + consent |
-| POST | `/api/interview/processing` | Start stub async job (FR-17) | Bearer |
-| GET | `/api/interview/processing/{task_id}` | Poll job: queued → processing → complete | Bearer |
+| GET | `/api/v1/health` | Liveness (`{status,time}`) | — |
+| POST | `/api/v1/auth/magic-link` | Request a passwordless sign-in link (FR-04) → 202 | — |
+| POST | `/api/v1/auth/verify` | Trade a link token for a role-scoped session (FR-04) | — |
+| GET | `/api/v1/auth/me` | Who am I? (both roles) | Bearer |
+| POST | `/api/v1/interview/consent` | Record consent (FR-01) → 201; appends CONSENT audit row | Bearer (candidate) |
+| GET | `/api/v1/interview/questions` | Base questions + 5:00 timer (FR-05); **403 until consent** | Bearer + consent |
+| POST | `/api/v1/interview/responses` | Upload one answer — 20 MB cap, type allow-list (FR-02/06) → 201 | Bearer + consent |
+| GET | `/api/v1/interview/responses/{id}` | Poll transcription status (FR-07/17) | Bearer + consent |
+| POST | `/api/v1/interview/events/tab-out` | Log a tab-switch (FR-12) → 202 | Bearer (candidate) |
+| GET | `/api/v1/interview/status` | Screen-flow driver (FR-17) | Bearer (candidate) |
 
-**Audio upload (FR-06):** `multipart/form-data` with `file` (webm/mp4/wav/m4a, ≤20 MB),
-`response_type` (`base`/`follow_up`), and `question_index` (required for base). Oversized
-files are rejected with **413** and never persisted; bad types get **415**. Only the file
-*path* is stored in Postgres; the audio lives under `media/<candidate_id>/`. A successful
-upload enqueues transcription (FR-07, currently a stub).
+**IDs are integers** (`job_id`, `candidate_id`, `response_id` …) per the contract.
 
-**Magic-link flow (FR-04):** `POST /request-link` (email + role, `job_id` for candidates)
-→ in development the response includes `dev_magic_link` / `dev_token` (real email is
-logged, not sent) → `POST /verify` with the token → copy `access_token` → in `/docs`
-click **Authorize** and paste it → `POST /consent` → `GET /questions`.
+**Audio upload:** `multipart/form-data` with `audio` (webm/mp4/wav/m4a, ≤20 MB),
+`question_id` (0 = follow-up), and `type` (`base`/`follow_up`). Oversized → **413**
+(never persisted); bad type → **415**. Only the file *path* is stored (audio lives
+under `media/<candidate_id>/`). Upload returns `status: "transcribing"`; the frontend
+polls `GET /responses/{id}` until final. Transcription itself (FR-07) is still a stub.
 
-Tokens are **single-use** and expire after 15 min; sessions are **role-scoped** — a
-candidate token is rejected (403) from `/api/recruiter/*` and vice versa. `dev-login`
-remains as a convenience for local testing but is not the production path.
+**Magic-link flow (FR-04):** `POST /auth/magic-link` `{email}` → in dev the 202 response
+includes `dev_magic_link` / `dev_token` (real email is logged, not sent) → `POST /auth/verify`
+`{token}` → use `session_token` as `Authorization: Bearer`. Tokens are **single-use**,
+expire after 15 min, and sessions are **role-scoped** (candidate token → 403 on recruiter
+work and vice versa).
+
+### Not yet built (in the contract, later slices)
+`/auth`-recruiter dashboard endpoints (`/jobs`, `/jobs/{id}/leaderboard`, `/candidates/{id}`,
+`/responses/{id}/audio`, `/system/budget-status`), the AI follow-up (`/interview/follow-up`),
+and real Whisper transcription/GPT scoring. These need scores data and the AI pipeline.

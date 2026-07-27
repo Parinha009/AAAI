@@ -1,0 +1,6 @@
+{
+  "session_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.recruiter.demo",
+  "role": "recruiter",
+  "expires_at": "2026-07-06T11:15:00Z",
+  "context": { "job_id": 1 }
+}

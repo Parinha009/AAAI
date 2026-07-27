@@ -2,7 +2,7 @@
 
 A **website** where a job candidate completes an interview by speaking to their computer — no live interviewer, no video call. The system records the answers, transcribes them, asks one AI-generated follow-up question, and produces a scorecard. A recruiter then signs in and reviews a ranked leaderboard.
 
-University capstone project · 11 weeks (22 Jun → 07 Sep 2026) · 4-person team.
+University capstone project · 11 weeks (22 Jun → 07 Oct 2026) · 4-person team.
 
 ---
 

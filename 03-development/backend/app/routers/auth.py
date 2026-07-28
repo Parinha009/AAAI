@@ -5,6 +5,7 @@ import secrets
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -37,11 +38,15 @@ def _hash(raw: str) -> str:
     summary="Request a passwordless sign-in link (FR-04)",
 )
 def magic_link(payload: MagicLinkRequest, db: Session = Depends(get_db)) -> MagicLinkResponse:
+    # Email is matched case-insensitively: addresses are not case-sensitive in
+    # practice, and a capitalised address must not silently yield no sign-in link.
+    email = payload.email.strip().lower()
+
     # Resolve the subject by email: recruiter first, else invited candidate.
-    recruiter = db.query(Recruiter).filter(Recruiter.email == payload.email).first()
+    recruiter = db.query(Recruiter).filter(func.lower(Recruiter.email) == email).first()
     candidate = None
     if recruiter is None:
-        candidate = db.query(Candidate).filter(Candidate.email == payload.email).first()
+        candidate = db.query(Candidate).filter(func.lower(Candidate.email) == email).first()
 
     resp = MagicLinkResponse()  # generic — never reveals whether the email exists
 
@@ -50,7 +55,7 @@ def magic_link(payload: MagicLinkRequest, db: Session = Depends(get_db)) -> Magi
         raw = secrets.token_urlsafe(32)
         token = MagicLinkToken(
             token_hash=_hash(raw),
-            email=payload.email,
+            email=email,
             role="recruiter" if recruiter else "candidate",
             job_id=candidate.job_id if candidate else None,
             expires_at=datetime.now(timezone.utc)
@@ -60,7 +65,7 @@ def magic_link(payload: MagicLinkRequest, db: Session = Depends(get_db)) -> Magi
         db.commit()
 
         link = f"{settings.frontend_base_url}/auth/callback?token={raw}"
-        send_magic_link(payload.email, link)
+        send_magic_link(email, link)
         if settings.environment == "development":
             resp.dev_magic_link = link
             resp.dev_token = raw
@@ -75,8 +80,13 @@ def magic_link(payload: MagicLinkRequest, db: Session = Depends(get_db)) -> Magi
     summary="Trade a link token for a session (FR-04)",
 )
 def verify(payload: VerifyRequest, db: Session = Depends(get_db)) -> VerifyResponse:
+    # .strip() only: surrounding whitespace is a copy/paste artifact, never part
+    # of a token (secrets.token_urlsafe emits no whitespace). The hash, and so
+    # the single-use and expiry checks below, are otherwise unchanged.
     token = (
-        db.query(MagicLinkToken).filter(MagicLinkToken.token_hash == _hash(payload.token)).first()
+        db.query(MagicLinkToken)
+        .filter(MagicLinkToken.token_hash == _hash(payload.token.strip()))
+        .first()
     )
     if token is None or token.consumed_at is not None or token.expires_at < datetime.now(timezone.utc):
         # One 401 for invalid / used / expired — don't leak which (FR-04).
@@ -87,7 +97,7 @@ def verify(payload: VerifyRequest, db: Session = Depends(get_db)) -> VerifyRespo
     if token.role == "candidate":
         candidate = (
             db.query(Candidate)
-            .filter(Candidate.email == token.email, Candidate.job_id == token.job_id)
+            .filter(func.lower(Candidate.email) == token.email, Candidate.job_id == token.job_id)
             .first()
         )
         if candidate is None:
@@ -95,7 +105,7 @@ def verify(payload: VerifyRequest, db: Session = Depends(get_db)) -> VerifyRespo
         session = create_session_token(role="candidate", subject_id=candidate.candidate_id, job_id=candidate.job_id)
         context = SessionContext(candidate_id=candidate.candidate_id, job_id=candidate.job_id)
     else:
-        recruiter = db.query(Recruiter).filter(Recruiter.email == token.email).first()
+        recruiter = db.query(Recruiter).filter(func.lower(Recruiter.email) == token.email).first()
         if recruiter is None:
             raise api_error(401, "UNAUTHORIZED", "Invalid sign-in link")
         session = create_session_token(role="recruiter", subject_id=recruiter.recruiter_id)

@@ -31,6 +31,8 @@ Internship Schedule.txt
 
 # Local scratch folder (screenshots, personal notes) — not team work
 Github_Repo/
+# QA preview images (slide renders) — safe to delete
+_qa/
 
 # ── Python / FastAPI (backend) ──
 __pycache__/

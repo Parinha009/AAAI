@@ -1,0 +1,1 @@
+{ "question_id": 0, "text": "You mentioned adding print statements to debug — how would you approach the same failure if it only happened in production and not locally?", "follow_up_seconds": 150 }

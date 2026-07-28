@@ -1,0 +1,24 @@
+flowchart TD
+    A["Recruiter sets up Job: base questions + rubric"] --> B["Candidate clicks magic-link invite (FR-04)"]
+    B --> C{"Consent given? (FR-01)"}
+    C -- No --> C
+    C -- Yes --> D["Persist consent; unlock workspace"]
+    D --> E["Base questions under one 5:00 global timer; record mic (FR-05 / FR-02)"]
+    E --> F["Upload + validate audio, max 20MB (FR-06)"]
+    F --> G["Processing ~15s async; Whisper transcription (FR-07 / FR-17)"]
+    G --> H["GPT-4o-mini asks ONE follow-up (FR-08)"]
+    H --> I["Answer follow-up under 2:30 (FR-09)"]
+    I --> J["Upload + transcribe follow-up"]
+    J --> K["GPT-4o-mini JSON scorecard: 4 traits + robotic-language check (FR-03 / FR-10)"]
+    K --> L{"JSON schema valid?"}
+    L -- "No, retry once" --> K
+    L -- "Still fails" --> M["Flag for manual review (FR-15)"]
+    L -- "Yes" --> N["Persist Scores"]
+    M --> N
+    N --> O["Recruiter dashboard: leaderboard, transcript, audio, review flags (FR-14 / FR-15)"]
+
+    G -. "log every AI call" .-> P[("AuditLogs: append-only + tab-out / clipboard signals (FR-11 / FR-12 / FR-13)")]
+    K -. "log every AI call" .-> P
+    R["Budget kill-switch $10/mo guards every AI call (FR-16)"] -.-> G
+    R -.-> H
+    R -.-> K

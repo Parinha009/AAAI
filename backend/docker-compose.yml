@@ -1,0 +1,24 @@
+# Local Postgres for development. Mirrors the managed instance used in staging
+# (Render/Railway). PostgreSQL is mandated by SRS-2.5 (relational integrity).
+services:
+  db:
+    image: postgres:16
+    container_name: aaai_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: aaai
+      POSTGRES_PASSWORD: aaai_dev_pw
+      POSTGRES_DB: aaai
+    # Host 5433 → container 5432 to avoid clashing with a native Postgres on 5432.
+    ports:
+      - "5433:5432"
+    volumes:
+      - aaai_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aaai -d aaai"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  aaai_pgdata:

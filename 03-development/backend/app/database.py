@@ -11,7 +11,15 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.config import settings
 
-engine = create_engine(settings.database_url, pool_pre_ping=True, future=True)
+# connect_timeout: without it, an unreachable database makes every request hang
+# indefinitely with no error, which is indistinguishable from an application bug.
+# Failing fast turns "the API is mysteriously stuck" into a clear, logged error.
+engine = create_engine(
+    settings.database_url,
+    pool_pre_ping=True,
+    future=True,
+    connect_args={"connect_timeout": 5},
+)
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
 

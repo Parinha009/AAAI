@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { loginByEmail } from './api'
 import CandidateDashboard from './pages/CandidateDashboard'
 import Landing from './pages/Landing'
 import Login from './pages/Login'
@@ -33,19 +34,41 @@ export default function App() {
     setFormData((current) => ({ ...current, [name]: value }))
   }
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault()
+    const email = formData.email.trim()
 
-    if (!formData.email.trim() || !formData.password.trim()) {
+    // LOGIN → real backend auth (passwordless magic-link, FR-04).
+    if (isLogin) {
+      if (!email) {
+        setMessage('Please enter your email.')
+        return
+      }
+      setMessage('Contacting backend…')
+      try {
+        const { session, me } = await loginByEmail(email)
+        setMessage(
+          `✓ Backend login OK — role: ${session.role}` +
+            (me.candidate_id ? `, candidate #${me.candidate_id}` : ''),
+        )
+        setFormData(emptyForm)
+        setShowPassword(false)
+        setMode(session.role === 'candidate' ? 'candidate' : 'landing')
+      } catch (err) {
+        setMessage(`✗ ${err.message}`)
+      }
+      return
+    }
+
+    // SIGNUP stays a local mockup — the passwordless backend has no self-registration.
+    if (!email || !formData.password.trim()) {
       setMessage('Please fill in the required fields.')
       return
     }
-
-    if (!isLogin && formData.password !== formData.confirmPassword) {
+    if (formData.password !== formData.confirmPassword) {
       setMessage('Passwords do not match.')
       return
     }
-
     setMessage('')
     setFormData(emptyForm)
     setShowPassword(false)

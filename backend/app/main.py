@@ -7,6 +7,7 @@ envelope wraps every non-2xx response.
 from datetime import datetime, timezone
 
 from fastapi import Depends, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -18,6 +19,15 @@ from app.routers import auth, interview
 API_PREFIX = "/api/v1"
 
 app = FastAPI(title=settings.app_name)
+
+# Allow the React dev server (Vite) to call the API from the browser.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins_list,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 register_error_handlers(app)
 

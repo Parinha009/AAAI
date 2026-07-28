@@ -30,6 +30,13 @@ class Settings(BaseSettings):
     frontend_base_url: str = "http://localhost:5173"  # link target the email points to
     email_enabled: bool = False  # False (dev): links are logged, not emailed
 
+    # CORS — origins allowed to call the API (the Vite dev server).
+    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
     # "Interview Physics" — fixed product constants (SRS-2.5), not user settings.
     base_round_seconds: int = 300  # 5:00 base round (FR-05)
     follow_up_seconds: int = 150  # 2:30 follow-up (FR-09)

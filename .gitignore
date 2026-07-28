@@ -83,3 +83,8 @@ logs/
 # Github_Repo/ holds personal screenshots; the PUSH-* file is a how-to guide.
 Github_Repo/
 PUSH-AAAI-to-GitHub_step-by-step.md
+
+# Per-machine Claude Code tool permissions — contains absolute local paths.
+# Only this file is ignored: if we ever add .claude/settings.json for shared
+# team settings, it is tracked normally.
+.claude/settings.local.json

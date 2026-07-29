@@ -15,10 +15,10 @@
 
 | Role | Reads | Builds against |
 | --- | --- | --- |
-| **Soeng — Frontend** | §3 Conventions, §5 Endpoints, `/fixtures/*.json` | The **fixtures**. Wire screens to mock JSON now; swap the base URL to the real backend in Week 4. |
+| **orn — Frontend** | §3 Conventions, §5 Endpoints, `/fixtures/*.json` | The **fixtures**. Wire screens to mock JSON now; swap the base URL to the real backend in Week 4. |
 | **Hokan — Backend** | §4 Data Model, §5 Endpoints, §6 Status codes | The **schemas + tables**. Endpoints must return exactly these shapes; DB must match §4. |
 | **Sovannareach — AI/Infra** | §4 (Scores, AuditLogs, Responses), §5 interview + scoring notes | The **Scores JSON shape** and the `response.status` lifecycle the pipeline drives. |
-| **You — Lead** | All. Own the freeze. | Coverage: every SRS-FR that needs an API is mapped in §2. |
+| **Parinha — Lead** | All. Own the freeze. | Coverage: every SRS-FR that needs an API is mapped in §2. |
 
 ---
 

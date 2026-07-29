@@ -86,10 +86,16 @@ def questions(
     db: Session = Depends(get_db),
 ) -> QuestionsResponse:
     job = db.get(Job, candidate.job_id)
+    # Stored questions may be plain strings (early seed) or objects carrying an
+    # extra `trait` hint for the scorer. Either way we emit only the three fields
+    # the contract freezes: question_id, order, text.
     items = [
-        Question(question_id=i + 1, order=i + 1, text=text)
-        for i, text in enumerate(job.base_questions or [])
+        Question(question_id=q.get("question_id", i + 1), order=q.get("order", i + 1), text=q["text"])
+        if isinstance(q, dict)
+        else Question(question_id=i + 1, order=i + 1, text=q)
+        for i, q in enumerate(job.base_questions or [])
     ]
+    items.sort(key=lambda q: q.order)
     if candidate.status == "consented":
         candidate.status = "in_progress"
         db.commit()

@@ -2775,6 +2775,180 @@ img {
   background: var(--accent);
 }
 
+.intro-recorder {
+  display: grid;
+  gap: 14px;
+  margin-top: 2px;
+  border: 1px solid rgba(18, 23, 34, 0.08);
+  border-radius: 10px;
+  padding: 16px;
+  background: #f7f9fc;
+}
+
+.intro-recorder-head,
+.intro-recorder-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.intro-recorder-head span {
+  display: block;
+  color: var(--accent-dark);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.intro-recorder-head h3 {
+  margin: 5px 0 0;
+  color: var(--charcoal);
+  font-size: 1.05rem;
+  line-height: 1.2;
+}
+
+.record-limit-pill {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid rgba(18, 23, 34, 0.08);
+  border-radius: 999px;
+  padding: 0 12px;
+  background: #ffffff;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1;
+}
+
+.record-limit-pill.active {
+  border-color: rgba(186, 90, 95, 0.18);
+  background: var(--error-soft);
+  color: var(--error);
+}
+
+.intro-video-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  min-height: 180px;
+  overflow: hidden;
+  border: 1px solid rgba(18, 23, 34, 0.08);
+  border-radius: 10px;
+  background: #101828;
+}
+
+.intro-video-frame.recording {
+  border-color: rgba(186, 90, 95, 0.24);
+  box-shadow: 0 0 0 4px rgba(186, 90, 95, 0.08);
+}
+
+.intro-video-frame video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #101828;
+}
+
+.intro-live-video {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.intro-live-video.active,
+.intro-playback-video {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.intro-video-empty {
+  position: absolute;
+  inset: 0;
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 10px;
+  color: rgba(255, 255, 255, 0.78);
+  font-weight: 760;
+}
+
+.intro-video-loading {
+  background: rgba(16, 24, 40, 0.76);
+}
+
+.intro-recorder-actions {
+  justify-content: flex-start;
+}
+
+.intro-recorder-actions .solid-button,
+.intro-recorder-actions .soft-button {
+  min-height: 44px;
+}
+
+.record-stop-button {
+  color: var(--error);
+  border-color: rgba(186, 90, 95, 0.22);
+  background: #ffffff;
+}
+
+.intro-download-button {
+  text-decoration: none;
+}
+
+.intro-recorder-status {
+  margin: 0;
+  max-width: none;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.intro-recorder-status.error {
+  color: var(--error);
+}
+
+.intro-evidence-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.intro-evidence-meta div {
+  border: 1px solid rgba(18, 23, 34, 0.07);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #ffffff;
+}
+
+.intro-evidence-meta dt,
+.intro-evidence-meta dd {
+  margin: 0;
+}
+
+.intro-evidence-meta dt {
+  color: var(--subtle);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.intro-evidence-meta dd {
+  margin-top: 4px;
+  color: var(--charcoal);
+  font-weight: 780;
+  overflow-wrap: anywhere;
+}
+
 .jobs-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(240px, 1fr));
@@ -4413,6 +4587,21 @@ img {
 
   .intro-panel .solid-button {
     width: 100%;
+  }
+
+  .intro-recorder-head,
+  .intro-recorder-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .intro-recorder-actions .solid-button,
+  .intro-recorder-actions .soft-button {
+    width: 100%;
+  }
+
+  .intro-evidence-meta {
+    grid-template-columns: 1fr;
   }
 
   .practice-modal {

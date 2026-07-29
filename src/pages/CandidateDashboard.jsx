@@ -1,67 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Icon from '../components/Icon'
 
 const navItems = [
   { id: 'intro', label: 'Private Introduction', icon: 'card' },
-  { id: 'jobs', label: 'Recommended Jobs', icon: 'briefcase' },
   { id: 'cv', label: 'CV Evaluation', icon: 'document' },
-  { id: 'preferences', label: 'Job Preferences', icon: 'sliders' },
   { id: 'applied', label: 'Applied Jobs', icon: 'clipboard' },
-  { id: 'assessments', label: 'Past Assessments', icon: 'award' },
-]
-
-const jobs = [
-  {
-    role: 'Frontend Developer',
-    company: 'TechCorp Asia',
-    icon: 'briefcase',
-    match: '95%',
-    location: 'Remote',
-    salary: '$80k - $100k',
-    type: 'Full-time',
-    tags: ['React', 'TypeScript', 'Tailwind'],
-  },
-  {
-    role: 'React Engineer',
-    company: 'StartupXYZ',
-    icon: 'rocket',
-    match: '88%',
-    location: 'Bangkok, TH',
-    salary: '$60k - $85k',
-    type: 'Full-time',
-    tags: ['React', 'Node.js', 'PostgreSQL'],
-  },
-  {
-    role: 'UI / UX Developer',
-    company: 'DesignStudio',
-    icon: 'palette',
-    match: '82%',
-    location: 'Hybrid',
-    salary: '$70k - $90k',
-    type: 'Contract',
-    tags: ['Figma', 'CSS', 'JavaScript'],
-  },
-  {
-    role: 'Full Stack Developer',
-    company: 'GlobalTech',
-    icon: 'globe',
-    match: '78%',
-    location: 'Remote',
-    salary: '$90k - $120k',
-    type: 'Full-time',
-    tags: ['React', 'Python', 'AWS'],
-  },
 ]
 
 const appliedJobs = [
   { role: 'Product Designer', company: 'InnovateCo', applied: 'Jul 15, 2026', status: 'Under Review', tone: 'warning' },
   { role: 'UX Researcher', company: 'DataViz Inc', applied: 'Jul 10, 2026', status: 'Interview Scheduled', tone: 'info' },
-]
-
-const assessments = [
-  { title: 'JavaScript Fundamentals', date: 'Jul 18, 2026', duration: '45 min', score: 92 },
-  { title: 'React & State Management', date: 'Jul 12, 2026', duration: '60 min', score: 85 },
-  { title: 'System Design Basics', date: 'Jul 8, 2026', duration: '90 min', score: 67 },
 ]
 
 const notifications = [
@@ -77,17 +25,6 @@ const notifications = [
   },
 ]
 
-const faqs = [
-  {
-    question: 'Where can I find my interview link?',
-    answer: 'Open the email from the company that invited you. Paste that link here to practice in the same format.',
-  },
-  {
-    question: "Don't have an interview link?",
-    answer: 'You can still begin a general practice session and use it to warm up before a real interview.',
-  },
-]
-
 const mockInterviewQuestion = {
   id: 'mock-base-question-1',
   type: 'base',
@@ -100,6 +37,94 @@ const formatTime = (seconds) => {
   const remainingSeconds = seconds % 60
 
   return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`
+}
+
+const INTRO_RECORD_LIMIT_SECONDS = 300
+const INTRO_EVIDENCE_DB = 'aaai-introduction-evidence'
+const INTRO_EVIDENCE_STORE = 'evidence'
+
+const formatRecordedAt = (dateValue) => new Intl.DateTimeFormat(undefined, {
+  dateStyle: 'medium',
+  timeStyle: 'short',
+}).format(new Date(dateValue))
+
+const getRecorderMimeType = () => {
+  if (typeof window === 'undefined' || !window.MediaRecorder?.isTypeSupported) {
+    return ''
+  }
+
+  return [
+    'video/webm;codecs=vp9,opus',
+    'video/webm;codecs=vp8,opus',
+    'video/webm;codecs=h264,opus',
+    'video/webm',
+    'video/mp4;codecs=h264,aac',
+    'video/mp4',
+  ].find((type) => window.MediaRecorder.isTypeSupported(type)) || ''
+}
+
+const getRecordingExtension = (mimeType) => (mimeType.includes('mp4') ? 'mp4' : 'webm')
+
+const openIntroEvidenceDatabase = () => new Promise((resolve, reject) => {
+  if (typeof window === 'undefined' || !window.indexedDB) {
+    resolve(null)
+    return
+  }
+
+  const request = window.indexedDB.open(INTRO_EVIDENCE_DB, 1)
+
+  request.onupgradeneeded = () => {
+    const database = request.result
+
+    if (!database.objectStoreNames.contains(INTRO_EVIDENCE_STORE)) {
+      database.createObjectStore(INTRO_EVIDENCE_STORE, { keyPath: 'id' })
+    }
+  }
+
+  request.onsuccess = () => resolve(request.result)
+  request.onerror = () => reject(request.error)
+})
+
+const loadIntroEvidence = async (id) => {
+  const database = await openIntroEvidenceDatabase()
+
+  if (!database) {
+    return null
+  }
+
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(INTRO_EVIDENCE_STORE, 'readonly')
+    const request = transaction.objectStore(INTRO_EVIDENCE_STORE).get(id)
+
+    request.onsuccess = () => resolve(request.result || null)
+    request.onerror = () => reject(request.error)
+    transaction.oncomplete = () => database.close()
+    transaction.onerror = () => {
+      database.close()
+      reject(transaction.error)
+    }
+  })
+}
+
+const saveIntroEvidence = async (id, evidence) => {
+  const database = await openIntroEvidenceDatabase()
+
+  if (!database) {
+    return false
+  }
+
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(INTRO_EVIDENCE_STORE, 'readwrite')
+    const request = transaction.objectStore(INTRO_EVIDENCE_STORE).put({ id, ...evidence })
+
+    request.onsuccess = () => resolve(true)
+    request.onerror = () => reject(request.error)
+    transaction.oncomplete = () => database.close()
+    transaction.onerror = () => {
+      database.close()
+      reject(transaction.error)
+    }
+  })
 }
 
 function InterviewWorkspace({ candidateName, onClose }) {
@@ -270,17 +295,349 @@ function DashboardHeader({ title, copy }) {
   )
 }
 
-function ScoreRing({ score }) {
+function PrivateIntroductionRecorder({ candidateName, candidateKey }) {
+  const [isRecording, setIsRecording] = useState(false)
+  const [elapsedSeconds, setElapsedSeconds] = useState(0)
+  const [recordedVideoUrl, setRecordedVideoUrl] = useState('')
+  const [recordedDuration, setRecordedDuration] = useState(0)
+  const [recordedAt, setRecordedAt] = useState('')
+  const [recordedMimeType, setRecordedMimeType] = useState('video/webm')
+  const [isPreviewReady, setIsPreviewReady] = useState(false)
+  const [recorderStatus, setRecorderStatus] = useState('No introduction evidence recorded yet.')
+  const [recorderError, setRecorderError] = useState('')
+  const previewRef = useRef(null)
+  const recorderRef = useRef(null)
+  const streamRef = useRef(null)
+  const chunksRef = useRef([])
+  const elapsedSecondsRef = useRef(0)
+  const recordedVideoUrlRef = useRef('')
+  const stopReasonRef = useRef('manual')
+  const mountedRef = useRef(true)
+  const hasRecording = Boolean(recordedVideoUrl)
+  const remainingSeconds = Math.max(INTRO_RECORD_LIMIT_SECONDS - elapsedSeconds, 0)
+  const downloadName = `private-introduction-${candidateName.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'candidate'}.${getRecordingExtension(recordedMimeType)}`
+
+  const setRecordedEvidenceUrl = (url) => {
+    if (recordedVideoUrlRef.current) {
+      window.URL.revokeObjectURL(recordedVideoUrlRef.current)
+    }
+
+    recordedVideoUrlRef.current = url
+    setRecordedVideoUrl(url)
+  }
+
+  const stopActiveStream = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop())
+      streamRef.current = null
+    }
+
+    if (previewRef.current) {
+      previewRef.current.srcObject = null
+    }
+
+    setIsPreviewReady(false)
+  }
+
+  const stopIntroductionRecording = (reason = 'manual') => {
+    stopReasonRef.current = reason
+
+    if (recorderRef.current && recorderRef.current.state !== 'inactive') {
+      recorderRef.current.stop()
+      return
+    }
+
+    stopActiveStream()
+    setIsRecording(false)
+  }
+
+  useEffect(() => () => {
+    mountedRef.current = false
+
+    if (recorderRef.current && recorderRef.current.state !== 'inactive') {
+      recorderRef.current.stop()
+    }
+
+    stopActiveStream()
+
+    if (recordedVideoUrlRef.current) {
+      window.URL.revokeObjectURL(recordedVideoUrlRef.current)
+    }
+  }, [])
+
+  useEffect(() => {
+    let isCurrent = true
+
+    const loadSavedEvidence = async () => {
+      setRecordedEvidenceUrl('')
+      setRecordedDuration(0)
+      setRecordedAt('')
+      setRecordedMimeType('video/webm')
+      setRecorderStatus('No introduction evidence recorded yet.')
+
+      try {
+        const evidence = await loadIntroEvidence(candidateKey)
+
+        if (!isCurrent || !evidence?.blob) {
+          return
+        }
+
+        const videoUrl = window.URL.createObjectURL(evidence.blob)
+        setRecordedEvidenceUrl(videoUrl)
+        setRecordedDuration(evidence.duration || 0)
+        setRecordedAt(evidence.recordedAt || '')
+        setRecordedMimeType(evidence.mimeType || evidence.blob.type || 'video/webm')
+        setRecorderStatus('Saved introduction evidence loaded from this browser.')
+      } catch {
+        if (isCurrent) {
+          setRecorderStatus('No introduction evidence recorded yet.')
+        }
+      }
+    }
+
+    loadSavedEvidence()
+
+    return () => {
+      isCurrent = false
+    }
+  }, [candidateKey])
+
+  useEffect(() => {
+    if (isRecording && previewRef.current && streamRef.current) {
+      previewRef.current.srcObject = streamRef.current
+      previewRef.current.play().catch(() => undefined)
+    }
+  }, [isRecording])
+
+  useEffect(() => {
+    if (!isRecording) {
+      return undefined
+    }
+
+    const intervalId = window.setInterval(() => {
+      setElapsedSeconds((current) => {
+        const next = Math.min(current + 1, INTRO_RECORD_LIMIT_SECONDS)
+        elapsedSecondsRef.current = next
+
+        if (next >= INTRO_RECORD_LIMIT_SECONDS) {
+          window.clearInterval(intervalId)
+          stopIntroductionRecording('limit')
+        }
+
+        return next
+      })
+    }, 1000)
+
+    return () => window.clearInterval(intervalId)
+  }, [isRecording])
+
+  const startIntroductionRecording = async () => {
+    setRecorderError('')
+    setIsPreviewReady(false)
+
+    if (isRecording) {
+      return
+    }
+
+    if (typeof window === 'undefined' || !navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+      setRecorderError('Video recording is not supported in this browser.')
+      return
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: {
+          facingMode: 'user',
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+      })
+      const hasLiveVideo = stream.getVideoTracks().some((track) => track.readyState === 'live')
+
+      if (!hasLiveVideo) {
+        stream.getTracks().forEach((track) => track.stop())
+        setRecorderError('No live camera video was detected. Please allow camera access and try again.')
+        return
+      }
+
+      const mimeType = getRecorderMimeType()
+      const mediaRecorder = new window.MediaRecorder(stream, mimeType ? { mimeType } : undefined)
+
+      chunksRef.current = []
+      elapsedSecondsRef.current = 0
+      stopReasonRef.current = 'manual'
+      streamRef.current = stream
+      recorderRef.current = mediaRecorder
+
+      if (previewRef.current) {
+        previewRef.current.srcObject = stream
+        previewRef.current.play().catch(() => undefined)
+      }
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data?.size) {
+          chunksRef.current.push(event.data)
+        }
+      }
+
+      mediaRecorder.onstop = async () => {
+        const duration = Math.min(elapsedSecondsRef.current, INTRO_RECORD_LIMIT_SECONDS)
+        const blobType = mediaRecorder.mimeType || chunksRef.current[0]?.type || mimeType || 'video/webm'
+        const evidenceBlob = new Blob(chunksRef.current, { type: blobType })
+        const reachedLimit = stopReasonRef.current === 'limit'
+
+        chunksRef.current = []
+        recorderRef.current = null
+        stopActiveStream()
+
+        if (!mountedRef.current) {
+          return
+        }
+
+        setIsRecording(false)
+
+        if (!evidenceBlob.size) {
+          setRecorderError('No video data was captured. Please try recording again.')
+          return
+        }
+
+        if (!evidenceBlob.type.startsWith('video/')) {
+          setRecorderError('Only audio was captured. Please enable your camera and record again.')
+          return
+        }
+
+        const videoUrl = window.URL.createObjectURL(evidenceBlob)
+        const recordedAtValue = new Date().toISOString()
+
+        setRecordedEvidenceUrl(videoUrl)
+        setRecordedDuration(duration)
+        setRecordedAt(recordedAtValue)
+        setRecordedMimeType(evidenceBlob.type)
+        setRecorderStatus(
+          reachedLimit
+            ? 'You have reached the 5-minute recording limit. Your introduction evidence has been saved.'
+            : 'Introduction evidence saved. You can review or download it anytime from this browser.'
+        )
+
+        try {
+          await saveIntroEvidence(candidateKey, {
+            blob: evidenceBlob,
+            candidateName,
+            duration,
+            mimeType: evidenceBlob.type,
+            recordedAt: recordedAtValue,
+          })
+
+          if (mountedRef.current && !reachedLimit) {
+            setRecorderStatus('Introduction evidence saved locally. You can review or download it anytime from this browser.')
+          }
+        } catch {
+          if (mountedRef.current) {
+            setRecorderStatus(
+              reachedLimit
+                ? 'You have reached the 5-minute recording limit. Your evidence is saved for this session.'
+                : 'Introduction evidence saved for this session. Download it to keep a copy.'
+            )
+          }
+        }
+      }
+
+      mediaRecorder.start(1000)
+      setElapsedSeconds(0)
+      setRecorderStatus('Recording your private introduction...')
+      setIsRecording(true)
+    } catch (error) {
+      stopActiveStream()
+
+      if (error?.name === 'NotAllowedError') {
+        setRecorderError('Camera and microphone permission is needed to record your introduction.')
+        return
+      }
+
+      setRecorderError('Could not start video recording. Check your camera and microphone and try again.')
+    }
+  }
+
   return (
-    <span className="assessment-score" style={{ '--score': `${score}%` }} aria-label={`${score}% score`}>
-      <strong>{score}%</strong>
-    </span>
+    <section className="intro-recorder" aria-label="Private introduction video evidence">
+      <header className="intro-recorder-head">
+        <div>
+          <span>Introduction evidence</span>
+          <h3>Recorded video statement</h3>
+        </div>
+        <strong className={isRecording ? 'record-limit-pill active' : 'record-limit-pill'}>
+          <Icon name="clock" size={16} />
+          {isRecording ? `${formatTime(remainingSeconds)} left` : '5:00 limit'}
+        </strong>
+      </header>
+
+      <div className={isRecording ? 'intro-video-frame recording' : 'intro-video-frame'}>
+        <video
+          ref={previewRef}
+          className={isRecording ? 'intro-live-video active' : 'intro-live-video'}
+          autoPlay
+          muted
+          playsInline
+          onCanPlay={() => setIsPreviewReady(true)}
+          onLoadedMetadata={() => previewRef.current?.play().catch(() => undefined)}
+        />
+        {!isRecording && hasRecording ? (
+          <video className="intro-playback-video" src={recordedVideoUrl} controls playsInline />
+        ) : null}
+        {!isRecording && !hasRecording ? (
+          <div className="intro-video-empty">
+            <Icon name="mic" size={30} />
+            <span>No video evidence recorded</span>
+          </div>
+        ) : null}
+        {isRecording && !isPreviewReady ? (
+          <div className="intro-video-empty intro-video-loading">
+            <Icon name="mic" size={30} />
+            <span>Starting camera preview...</span>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="intro-recorder-actions">
+        <button
+          type="button"
+          className={isRecording ? 'soft-button record-stop-button' : 'solid-button'}
+          onClick={isRecording ? () => stopIntroductionRecording() : startIntroductionRecording}
+        >
+          <Icon name={isRecording ? 'stop' : 'mic'} />
+          {isRecording ? 'Stop and save' : 'Record introduction'}
+        </button>
+        {hasRecording && !isRecording ? (
+          <a className="soft-button intro-download-button" href={recordedVideoUrl} download={downloadName}>
+            <Icon name="document" />
+            Download evidence
+          </a>
+        ) : null}
+      </div>
+
+      <p className={recorderError ? 'intro-recorder-status error' : 'intro-recorder-status'} aria-live="polite">
+        {recorderError || recorderStatus}
+      </p>
+
+      {hasRecording && !isRecording ? (
+        <dl className="intro-evidence-meta">
+          <div>
+            <dt>Duration</dt>
+            <dd>{formatTime(recordedDuration)}</dd>
+          </div>
+          <div>
+            <dt>Recorded</dt>
+            <dd>{recordedAt ? formatRecordedAt(recordedAt) : 'Just now'}</dd>
+          </div>
+        </dl>
+      ) : null}
+    </section>
   )
 }
 
 export default function CandidateDashboard({ user, onOpenLogin, onOpenSignup, onBackToLanding }) {
   const [activeView, setActiveView] = useState('intro')
-  const [expandedFaq, setExpandedFaq] = useState('')
   const [isPracticeOpen, setIsPracticeOpen] = useState(false)
   const [isInterviewOpen, setIsInterviewOpen] = useState(false)
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
@@ -310,52 +667,6 @@ export default function CandidateDashboard({ user, onOpenLogin, onOpenSignup, on
   }
 
   const renderContent = () => {
-    if (activeView === 'jobs') {
-      return (
-        <>
-          <DashboardHeader title="Recommended Jobs" copy="Jobs matched to your profile and preferences." />
-          <div className="jobs-grid">
-            {jobs.map((job) => (
-              <article className="job-card" key={`${job.role}-${job.company}`}>
-                <div className="job-card-top">
-                  <span className="job-icon" aria-hidden="true">
-                    <Icon name={job.icon} />
-                  </span>
-                  <div>
-                    <h2>{job.role}</h2>
-                    <p>{job.company}</p>
-                  </div>
-                  <span className="match-pill">{job.match} match</span>
-                </div>
-                <dl className="job-meta">
-                  <div>
-                    <dt>Location</dt>
-                    <dd>{job.location}</dd>
-                  </div>
-                  <div>
-                    <dt>Salary</dt>
-                    <dd>{job.salary}</dd>
-                  </div>
-                  <div>
-                    <dt>Type</dt>
-                    <dd>{job.type}</dd>
-                  </div>
-                </dl>
-                <div className="tag-row">
-                  {job.tags.map((tag) => (
-                    <span key={tag}>{tag}</span>
-                  ))}
-                </div>
-                <button type="button" className="solid-button full-width">
-                  Apply Now
-                </button>
-              </article>
-            ))}
-          </div>
-        </>
-      )
-    }
-
     if (activeView === 'cv') {
       return (
         <>
@@ -370,48 +681,6 @@ export default function CandidateDashboard({ user, onOpenLogin, onOpenSignup, on
               <input id="cv-upload" type="file" accept=".pdf,.doc,.docx" />
             </label>
           </section>
-        </>
-      )
-    }
-
-    if (activeView === 'preferences') {
-      return (
-        <>
-          <DashboardHeader title="Job Preferences" copy="Tell us what you are looking for in your next role." />
-          <form className="dashboard-card preference-form">
-            <label>
-              <span>Desired Role</span>
-              <input type="text" placeholder="e.g. Frontend Developer, Product Designer" />
-            </label>
-            <label>
-              <span>Preferred Location</span>
-              <input type="text" placeholder="e.g. Bangkok, Singapore, Remote" />
-            </label>
-            <label className="range-field">
-              <span>Minimum Salary (USD / year) - $50,000</span>
-              <input type="range" min="30000" max="160000" defaultValue="50000" />
-            </label>
-            <label>
-              <span>Work Type</span>
-              <select defaultValue="Any">
-                <option>Any</option>
-                <option>Remote</option>
-                <option>Hybrid</option>
-                <option>On-site</option>
-              </select>
-            </label>
-            <label>
-              <span>Industry</span>
-              <input type="text" placeholder="e.g. Technology, Finance, Healthcare" />
-            </label>
-            <label className="checkbox-line">
-              <input type="checkbox" defaultChecked />
-              <span>Open to fully remote opportunities</span>
-            </label>
-            <button type="button" className="solid-button preference-submit">
-              Save Preferences
-            </button>
-          </form>
         </>
       )
     }
@@ -448,58 +717,6 @@ export default function CandidateDashboard({ user, onOpenLogin, onOpenSignup, on
       )
     }
 
-    if (activeView === 'assessments') {
-      return (
-        <>
-          <DashboardHeader title="Past Assessments" copy="Review your past AI interview and skills assessments." />
-          <section className="dashboard-card practice-strip">
-            <div className="strip-icon" aria-hidden="true">
-              <Icon name="mic" />
-            </div>
-            <div>
-              <h2>Have an upcoming AAAI interview?</h2>
-              <p>Paste your interview link to practice with an AI session shaped like your real interview before it counts.</p>
-            </div>
-            <input type="url" defaultValue="https://aaai.ai/interview/candidate-practice" aria-label="Interview link" />
-            <button type="button" className="solid-button" onClick={openPractice}>
-              <span>Begin Practice</span>
-              <Icon name="arrowRight" />
-            </button>
-          </section>
-
-          <div className="faq-list">
-            {faqs.map((faq) => (
-              <section className="faq-item" key={faq.question}>
-                <button
-                  type="button"
-                  onClick={() => setExpandedFaq((current) => (current === faq.question ? '' : faq.question))}
-                  aria-expanded={expandedFaq === faq.question}
-                >
-                  <span>{faq.question}</span>
-                  <Icon name="chevronDown" className="chevron-icon" />
-                </button>
-                {expandedFaq === faq.question ? <p>{faq.answer}</p> : null}
-              </section>
-            ))}
-          </div>
-
-          <h2 className="history-title">Past Assessment History</h2>
-          <div className="assessment-list">
-            {assessments.map((assessment) => (
-              <article className="assessment-row" key={assessment.title}>
-                <div>
-                  <h3>{assessment.title}</h3>
-                  <p>{assessment.date} - {assessment.duration}</p>
-                </div>
-                <ScoreRing score={assessment.score} />
-                <span className="passed-chip">Passed</span>
-              </article>
-            ))}
-          </div>
-        </>
-      )
-    }
-
     return (
       <>
         <DashboardHeader
@@ -528,6 +745,7 @@ export default function CandidateDashboard({ user, onOpenLogin, onOpenSignup, on
             <button type="button" className="solid-button">
               Complete profile
             </button>
+            <PrivateIntroductionRecorder candidateName={firstName} candidateKey={profile.email} />
           </div>
 
           <aside className="intro-panel-side" aria-label="Private introduction status">

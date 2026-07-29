@@ -88,13 +88,12 @@ const faqs = [
   },
 ]
 
-const interviewQuestions = [
-  'Walk us through a recent project where you solved a difficult technical problem.',
-  'How do you explain tradeoffs when a product deadline conflicts with code quality?',
-  'Tell us about a time you debugged an issue with limited information.',
-]
-
-const followUpQuestion = 'You mentioned debugging with limited information. What exact signal would you inspect first, and why?'
+const mockInterviewQuestion = {
+  id: 'mock-base-question-1',
+  type: 'base',
+  baseRoundSeconds: 300,
+  prompt: 'Walk us through a recent project where you solved a difficult technical problem.',
+}
 
 const formatTime = (seconds) => {
   const minutes = Math.floor(seconds / 60)
@@ -106,13 +105,11 @@ const formatTime = (seconds) => {
 function InterviewWorkspace({ candidateName, onClose }) {
   const [stage, setStage] = useState('consent')
   const [consentAccepted, setConsentAccepted] = useState(false)
-  const [questionIndex, setQuestionIndex] = useState(0)
-  const [baseSeconds, setBaseSeconds] = useState(300)
-  const [followUpSeconds, setFollowUpSeconds] = useState(150)
+  const [baseSeconds, setBaseSeconds] = useState(mockInterviewQuestion.baseRoundSeconds)
   const [isRecording, setIsRecording] = useState(false)
-  const [answers, setAnswers] = useState([])
+  const [mockAnswer, setMockAnswer] = useState(null)
   const [tabOutCount, setTabOutCount] = useState(0)
-  const isTimedStage = stage === 'base' || stage === 'followup'
+  const isTimedStage = stage === 'question'
 
   useEffect(() => {
     if (!isTimedStage) {
@@ -138,7 +135,7 @@ function InterviewWorkspace({ candidateName, onClose }) {
   }, [isTimedStage])
 
   useEffect(() => {
-    if (stage !== 'base') {
+    if (stage !== 'question') {
       return undefined
     }
 
@@ -150,75 +147,39 @@ function InterviewWorkspace({ candidateName, onClose }) {
   }, [stage])
 
   useEffect(() => {
-    if (stage !== 'followup') {
-      return undefined
-    }
-
-    const intervalId = window.setInterval(() => {
-      setFollowUpSeconds((current) => Math.max(current - 1, 0))
-    }, 1000)
-
-    return () => window.clearInterval(intervalId)
-  }, [stage])
-
-  useEffect(() => {
-    if (stage === 'base' && baseSeconds === 0) {
-      submitBaseAnswer()
+    if (stage === 'question' && baseSeconds === 0) {
+      setIsRecording(false)
+      setMockAnswer((current) => current || {
+        questionId: mockInterviewQuestion.id,
+        transcript: 'Mock transcript captured when the shared 5:00 timer ended.',
+      })
     }
   }, [baseSeconds, stage])
 
-  useEffect(() => {
-    if (stage === 'followup' && followUpSeconds === 0) {
-      completeInterview()
-    }
-  }, [followUpSeconds, stage])
-
   const beginBaseRound = () => {
-    setStage('base')
-    setIsRecording(true)
+    setStage('question')
+    setBaseSeconds(mockInterviewQuestion.baseRoundSeconds)
+    setIsRecording(false)
+    setMockAnswer(null)
   }
 
-  const submitBaseAnswer = () => {
-    if (stage !== 'base') {
+  const toggleRecording = () => {
+    if (stage !== 'question' || baseSeconds === 0) {
       return
     }
 
-    setIsRecording(false)
-    setAnswers((current) => [
-      ...current,
-      {
-        question: interviewQuestions[questionIndex],
-        transcript: 'Mock transcript captured from the browser interview preview.',
-      },
-    ])
-    setStage('processing')
+    setIsRecording((current) => {
+      const nextRecordingState = !current
 
-    window.setTimeout(() => {
-      if (questionIndex < interviewQuestions.length - 1) {
-        setQuestionIndex((current) => current + 1)
-        setStage('base')
-        setIsRecording(true)
-      } else {
-        setStage('followup')
-        setIsRecording(true)
+      if (!nextRecordingState) {
+        setMockAnswer({
+          questionId: mockInterviewQuestion.id,
+          transcript: 'Mock transcript captured from the single-question interview preview.',
+        })
       }
-    }, 1100)
-  }
 
-  const completeInterview = () => {
-    if (stage !== 'followup') {
-      return
-    }
-
-    setIsRecording(false)
-    setAnswers((current) => [
-      ...current,
-      {
-        question: followUpQuestion,
-        transcript: 'Mock follow-up transcript captured from the timed answer window.',
-      },
-    ])
-    setStage('complete')
+      return nextRecordingState
+    })
   }
 
   return (
@@ -260,74 +221,40 @@ function InterviewWorkspace({ candidateName, onClose }) {
           </>
         ) : null}
 
-        {stage === 'base' ? (
+        {stage === 'question' ? (
           <>
             <div className="interview-panel-head">
-              <span>Base question {questionIndex + 1} of {interviewQuestions.length}</span>
+              <span>Base question 1 of 1</span>
               <strong><Icon name="clock" /> {formatTime(baseSeconds)}</strong>
             </div>
-            <h1 id="interview-title">{interviewQuestions[questionIndex]}</h1>
-            <p>Answer naturally. The base round uses one shared five-minute timer across all questions.</p>
+            <h1 id="interview-title">{mockInterviewQuestion.prompt}</h1>
+            <p>
+              Answer naturally. This mocked FR-05 view uses one shared five-minute timer for the base round.
+            </p>
             <div className={isRecording ? 'recording-orb active' : 'recording-orb'} aria-hidden="true">
               <Icon name="mic" size={34} />
             </div>
+            <p className="recording-status" aria-live="polite">
+              {baseSeconds === 0
+                ? 'Time is up. Your mock answer is saved.'
+                : isRecording
+                  ? 'Recording in progress.'
+                  : mockAnswer
+                    ? 'Mock answer saved. Press record again to replace it.'
+                    : 'Ready when you are.'}
+            </p>
             <div className="interview-actions">
-              <button type="button" className="soft-button" onClick={() => setIsRecording((current) => !current)}>
+              <button
+                type="button"
+                className="solid-button record-only-button"
+                onClick={toggleRecording}
+                disabled={baseSeconds === 0}
+              >
                 <Icon name={isRecording ? 'stop' : 'mic'} />
-                {isRecording ? 'Pause recording' : 'Resume recording'}
-              </button>
-              <button type="button" className="solid-button" onClick={submitBaseAnswer}>
-                Submit answer
+                {isRecording ? 'Stop recording' : 'Record answer'}
               </button>
             </div>
           </>
-        ) : null}
-
-        {stage === 'processing' ? (
-          <div className="processing-state" aria-live="polite">
-            <span className="processing-spinner" aria-hidden="true" />
-            <h1 id="interview-title">Processing your answer</h1>
-            <p>Preparing the next question. This keeps the experience calm even when AI work takes a moment.</p>
-          </div>
-        ) : null}
-
-        {stage === 'followup' ? (
-          <>
-            <div className="interview-panel-head">
-              <span>Dynamic follow-up</span>
-              <strong><Icon name="clock" /> {formatTime(followUpSeconds)}</strong>
-            </div>
-            <h1 id="interview-title">{followUpQuestion}</h1>
-            <p>This follow-up is intentionally short and time-boxed so recruiters can hear real reasoning.</p>
-            <div className={isRecording ? 'recording-orb active' : 'recording-orb'} aria-hidden="true">
-              <Icon name="mic" size={34} />
-            </div>
-            <div className="interview-actions">
-              <button type="button" className="soft-button" onClick={() => setIsRecording((current) => !current)}>
-                <Icon name={isRecording ? 'stop' : 'mic'} />
-                {isRecording ? 'Pause recording' : 'Resume recording'}
-              </button>
-              <button type="button" className="solid-button" onClick={completeInterview}>
-                Finish interview
-              </button>
-            </div>
-          </>
-        ) : null}
-
-        {stage === 'complete' ? (
-          <div className="complete-state">
-            <span className="complete-mark"><Icon name="check" size={30} /></span>
-            <h1 id="interview-title">Interview submitted</h1>
-            <p>Your responses are ready for recruiter review. Thank you for completing the AAAI interview.</p>
-            <div className="complete-summary">
-              <span>{answers.length} responses</span>
-              <span>{tabOutCount} tab outs</span>
-              <span>Manual review ready</span>
-            </div>
-            <button type="button" className="solid-button" onClick={onClose}>
-              Return to dashboard
-            </button>
-          </div>
         ) : null}
       </section>
     </div>

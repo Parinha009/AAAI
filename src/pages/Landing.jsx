@@ -84,11 +84,20 @@ const roleOptions = [
   },
 ]
 
-export default function Landing({ onGoToLogin, onGoToSignup, onChooseCompany, onChooseCandidate }) {
+export default function Landing({
+  currentUser,
+  onGoToLogin,
+  onGoToSignup,
+  onChooseCompany,
+  onChooseCandidate,
+  onGetStarted,
+}) {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [selectedRole, setSelectedRole] = useState('candidate')
   const [activePanel, setActivePanel] = useState('')
   const headerRef = useRef(null)
+  const firstName = currentUser?.name?.split(' ')[0] || 'Account'
+  const initial = firstName.charAt(0).toUpperCase()
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -157,16 +166,34 @@ export default function Landing({ onGoToLogin, onGoToSignup, onChooseCompany, on
           </nav>
 
           <div className="nav-actions">
-            <button type="button" className="ghost-button" onClick={onGoToLogin}>
-              Login
-            </button>
-            <button type="button" className="ghost-button" onClick={onGoToSignup}>
-              Sign Up
-            </button>
-            <button type="button" className="solid-button small" onClick={() => setIsDialogOpen(true)}>
-              <span>Get Started</span>
-              <Icon name="arrowRight" />
-            </button>
+            {currentUser ? (
+              <>
+                <div className="landing-profile-chip" aria-label={`Signed in as ${currentUser.name}`}>
+                  <span className="avatar">{initial}</span>
+                  <div>
+                    <strong>{firstName}</strong>
+                    <small>{currentUser.email}</small>
+                  </div>
+                </div>
+                <button type="button" className="solid-button small" onClick={onGetStarted}>
+                  <span>Get Started</span>
+                  <Icon name="arrowRight" />
+                </button>
+              </>
+            ) : (
+              <>
+                <button type="button" className="ghost-button" onClick={onGoToLogin}>
+                  Login
+                </button>
+                <button type="button" className="ghost-button" onClick={onGoToSignup}>
+                  Sign Up
+                </button>
+                <button type="button" className="solid-button small" onClick={() => setIsDialogOpen(true)}>
+                  <span>Get Started</span>
+                  <Icon name="arrowRight" />
+                </button>
+              </>
+            )}
           </div>
         </header>
 
@@ -196,12 +223,14 @@ export default function Landing({ onGoToLogin, onGoToSignup, onChooseCompany, on
           </p>
 
           <div className="hero-actions">
-            <button type="button" className="solid-button" onClick={() => setIsDialogOpen(true)}>
-              Start free
+            <button type="button" className="solid-button" onClick={currentUser ? onGetStarted : () => setIsDialogOpen(true)}>
+              {currentUser ? 'Go to workspace' : 'Start free'}
             </button>
-            <button type="button" className="soft-button" onClick={onGoToSignup}>
-              Create account
-            </button>
+            {currentUser ? null : (
+              <button type="button" className="soft-button" onClick={onGoToSignup}>
+                Create account
+              </button>
+            )}
           </div>
 
           <dl className="hero-metrics" aria-label="Product highlights">

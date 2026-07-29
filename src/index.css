@@ -274,6 +274,40 @@ img {
   gap: 8px;
 }
 
+.landing-profile-chip {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(32, 35, 43, 0.08);
+  border-radius: 999px;
+  padding: 4px 12px 4px 6px;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 10px 24px rgba(18, 23, 34, 0.06);
+}
+
+.landing-profile-chip div {
+  display: grid;
+  gap: 1px;
+  line-height: 1.05;
+}
+
+.landing-profile-chip strong {
+  color: var(--charcoal);
+  font-size: 0.9rem;
+  font-weight: 850;
+}
+
+.landing-profile-chip small {
+  max-width: 156px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 720;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .landing-hero {
   width: min(1180px, calc(100% - 40px));
   min-height: calc(100vh - 72px);
@@ -3386,6 +3420,14 @@ img {
   animation: pulseRecord 1400ms ease-in-out infinite;
 }
 
+.recording-status {
+  font-weight: 780;
+}
+
+.record-only-button {
+  min-width: 220px;
+}
+
 .processing-state,
 .complete-state {
   display: grid;
@@ -4111,6 +4153,14 @@ img {
   .solid-button.small {
     min-height: 40px;
     padding: 0 14px;
+  }
+
+  .landing-profile-chip {
+    padding-right: 8px;
+  }
+
+  .landing-profile-chip small {
+    display: none;
   }
 
   .landing-hero,

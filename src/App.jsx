@@ -65,7 +65,8 @@ export default function App() {
   const [loadingAction, setLoadingAction] = useState('')
   const [authNotice, setAuthNotice] = useState('')
   const [toast, setToast] = useState(null)
-  const [currentUser, setCurrentUser] = useState(accountProfiles.get('ben@gmail.com'))
+  const [currentUser, setCurrentUser] = useState(null)
+  const [currentRole, setCurrentRole] = useState('candidate')
 
   useEffect(() => {
     if (!toast) {
@@ -172,12 +173,13 @@ export default function App() {
         return
       }
 
-      showToast('success', 'Welcome back', 'Your workspace is opening now.')
+      showToast('success', 'Welcome back', 'Your profile is now on the home page.')
       setCurrentUser(accountProfiles.get(confirmedEmail) || { name: 'Candidate', email: confirmedEmail })
+      setCurrentRole(authRole === 'company' ? 'company' : 'candidate')
       resetForm()
       setConfirmedEmail('')
       setLoginStep('email')
-      setMode(authRole === 'company' ? 'company' : 'candidate')
+      setMode('landing')
       setLoadingAction('')
     }, 700)
   }
@@ -224,10 +226,11 @@ export default function App() {
     setAuthNotice('')
 
     window.setTimeout(() => {
-      showToast('success', 'Account created successfully', 'Your candidate workspace is ready.')
+      showToast('success', 'Account created successfully', 'Your profile is now on the home page.')
       setCurrentUser({ name: formData.fullName.trim(), email })
+      setCurrentRole(authRole === 'company' ? 'company' : 'candidate')
       resetForm()
-      setMode(authRole === 'company' ? 'company' : 'candidate')
+      setMode('landing')
       setLoadingAction('')
     }, 760)
   }
@@ -265,6 +268,15 @@ export default function App() {
   const handleChooseCompany = () => openLogin({ role: 'company' })
 
   const handleChooseCandidate = () => openLogin({ role: 'candidate' })
+
+  const handleGetStarted = () => {
+    if (!currentUser) {
+      openLogin({ role: 'candidate' })
+      return
+    }
+
+    setMode(currentRole === 'company' ? 'company' : 'candidate')
+  }
 
   return (
     <>
@@ -312,10 +324,12 @@ export default function App() {
         />
       ) : (
         <Landing
+          currentUser={currentUser}
           onChooseCandidate={handleChooseCandidate}
           onChooseCompany={handleChooseCompany}
           onGoToLogin={() => openLogin()}
           onGoToSignup={() => openSignup()}
+          onGetStarted={handleGetStarted}
         />
       )}
 

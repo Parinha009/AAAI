@@ -16,6 +16,7 @@ from app.config import settings
 from app.database import get_db
 from app.errors import api_error
 from app.models import Candidate, Recruiter
+from app.roles import Role
 
 _SALT = "aaai-session"
 _serializer = URLSafeTimedSerializer(settings.secret_key, salt=_SALT)
@@ -59,7 +60,7 @@ def get_current_candidate(
     db: Session = Depends(get_db),
 ) -> Candidate:
     data = _payload(creds)
-    if data.get("role") != "candidate":
+    if data.get("role") != Role.CANDIDATE.value:
         raise api_error(403, "FORBIDDEN", "Candidate session required")
     candidate = db.get(Candidate, int(data["sub"]))
     if candidate is None:
@@ -72,12 +73,22 @@ def get_current_recruiter(
     db: Session = Depends(get_db),
 ) -> Recruiter:
     data = _payload(creds)
-    if data.get("role") != "recruiter":
+    if data.get("role") != Role.RECRUITER.value:
         raise api_error(403, "FORBIDDEN", "Recruiter session required")
     recruiter = db.get(Recruiter, int(data["sub"]))
     if recruiter is None:
         raise api_error(401, "UNAUTHORIZED", "Recruiter not found")
     return recruiter
+
+
+def get_current_admin(
+    creds: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+) -> dict:
+    """Admin (Project Lead) session. Scaffolded — admin tokens aren't issued yet."""
+    data = _payload(creds)
+    if data.get("role") != Role.ADMIN.value:
+        raise api_error(403, "FORBIDDEN", "Admin session required")
+    return data
 
 
 def require_consent(candidate: Candidate = Depends(get_current_candidate)) -> Candidate:

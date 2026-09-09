@@ -56,6 +56,21 @@ alembic downgrade base    # roll back to empty
 alembic revision -m "..." # new migration (autogenerate off by default)
 ```
 
+## Tests
+
+Automated suite in [tests/](tests/) — run against the dev Postgres (Docker must be up):
+
+```bash
+pip install -r requirements-dev.txt
+docker compose up -d db
+pytest
+```
+
+16 tests cover: auth (magic-link, verify, single-use, anti-enumeration), the consent
+gate (403 → 201 → 200), audio upload validation (201 / 413 / 415), tab-out logging +
+audit-log immutability, RBAC on `budget-status`, the budget kill-switch guard, and the
+recruiter dashboard (jobs, ranked leaderboard, candidate detail, audio playback).
+
 ## API routes — aligned to **API Contract v1**
 
 All routes are under **`/api/v1`**. Every non-2xx response uses the standard
@@ -77,6 +92,11 @@ python -m app.seed   # prints JOB_ID (int), CANDIDATE_EMAIL, RECRUITER_EMAIL
 | GET | `/api/v1/interview/responses/{id}` | Poll transcription status (FR-07/17) | Bearer + consent |
 | POST | `/api/v1/interview/events/tab-out` | Log a tab-switch (FR-12) → 202 | Bearer (candidate) |
 | GET | `/api/v1/interview/status` | Screen-flow driver (FR-17) | Bearer (candidate) |
+| GET | `/api/v1/system/budget-status` | AI spend vs the $10 cap (FR-16) | Bearer + `view_budget` |
+| GET | `/api/v1/jobs` | List jobs + candidate counts (FR-14) | recruiter |
+| GET | `/api/v1/jobs/{id}/leaderboard` | Ranked candidates + review flags (FR-14/15) | recruiter |
+| GET | `/api/v1/candidates/{id}` | Full drill-down: transcripts, scores, audio links (FR-14/15) | recruiter |
+| GET | `/api/v1/responses/{id}/audio` | Stream one recording for playback (FR-15) | recruiter + `play_audio` |
 
 **IDs are integers** (`job_id`, `candidate_id`, `response_id` …) per the contract.
 
@@ -92,7 +112,54 @@ includes `dev_magic_link` / `dev_token` (real email is logged, not sent) → `PO
 expire after 15 min, and sessions are **role-scoped** (candidate token → 403 on recruiter
 work and vice versa).
 
-### Not yet built (in the contract, later slices)
-`/auth`-recruiter dashboard endpoints (`/jobs`, `/jobs/{id}/leaderboard`, `/candidates/{id}`,
-`/responses/{id}/audio`, `/system/budget-status`), the AI follow-up (`/interview/follow-up`),
-and real Whisper transcription/GPT scoring. These need scores data and the AI pipeline.
+## Access control (RBAC)
+
+Roles and permissions live in [app/roles.py](app/roles.py); the guards in
+[app/rbac.py](app/rbac.py). The three roles are the **SRS-2.3 user classes**, and each
+role's permissions map to what the SRS says that class may do:
+
+| Role (SRS-2.3) | Granted permissions |
+|------|---------------------|
+| `candidate` | give_consent, answer_interview, upload_response — *no scoring visibility* |
+| `recruiter` | view_leaderboard, view_candidate, play_audio, override_score, view_budget |
+| `admin` — Project Lead *(scaffolded)* | recruiter perms **+** manage_questions, manage_rubric, manage_prompts, run_qa |
+
+Protect any route by **role** or **permission**:
+
+```python
+from fastapi import Depends
+from app.rbac import require_role, require_permission
+from app.roles import Role, Permission
+
+# role-based
+@router.get("/jobs", dependencies=[Depends(require_role(Role.RECRUITER, Role.ADMIN))])
+def list_jobs(): ...
+
+# permission-based
+@router.post("/jobs", dependencies=[Depends(require_permission(Permission.MANAGE_JOBS))])
+def create_job(): ...
+```
+
+A wrong role/permission returns **403** in the standard error envelope. `admin` is
+defined and enforced but not issuable yet (the contract only mints `candidate`/`recruiter`
+tokens) — enabling admin sign-in is a small contract-v1.1 step.
+
+## Budget kill-switch (FR-16 / NFR-03)
+
+A DB-backed monthly spend counter (`budget_usage`) enforces the **$10/month** OpenAI
+ceiling. The AI pipeline uses two hooks in [app/budget.py](app/budget.py):
+
+- `budget.guard(db, ...)` **before** every OpenAI call → raises **429 `BUDGET_EXCEEDED`** once the ceiling is reached.
+- `budget.charge(db, usd, ...)` **after** every call → adds the estimated cost; writes a `BUDGET_FREEZE` audit row the moment the cap is crossed.
+
+Recruiters see the state via `GET /system/budget-status` (`ok` / `paused`).
+
+> **Second safeguard (NFR-03, manual):** also set a **$10 hard spending limit in the
+> OpenAI dashboard** — an independent, provider-side backstop that no code can bypass.
+> This is a console setting, not something the backend can configure.
+
+### Not yet built (later slices)
+The **AI pipeline** — real Whisper transcription (FR-07), the GPT follow-up
+(`/interview/follow-up`, FR-08), and JSON scoring (FR-03/10) — plus **real email
+delivery** for magic links. The budget hooks, upload storage, and recruiter dashboard
+are all ready for scores the moment the AI pipeline produces them.

@@ -81,3 +81,7 @@ logs/
 # Github_Repo/ holds personal screenshots; the PUSH-* file is a how-to guide.
 Github_Repo/
 PUSH-AAAI-to-GitHub_step-by-step.md
+
+# Local Vite workaround for a stray C:\postcss.config.mjs on one dev machine.
+# Not needed by teammates — keep it out of the repo.
+postcss.config.js

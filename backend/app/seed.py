@@ -5,8 +5,10 @@
 Prints the demo JOB_ID plus the candidate/recruiter emails to request links for.
 """
 
+from datetime import datetime, timezone
+
 from app.database import SessionLocal
-from app.models import Candidate, Job, Recruiter
+from app.models import AuditLog, Candidate, Job, Recruiter, Response, Score
 
 DEMO_TITLE = "Demo — Backend Engineer"
 DEMO_CANDIDATE_EMAIL = "candidate@demo.local"
@@ -67,8 +69,60 @@ def main() -> None:
         else:
             print("Demo recruiter already exists.")
         print(f"RECRUITER_EMAIL: {recruiter.email}")
+
+        _seed_scored_candidates(db, job)
     finally:
         db.close()
+
+
+def _seed_scored_candidates(db, job) -> None:
+    """Two demo candidates with scores so the recruiter leaderboard has data.
+    (Stands in until the real AI scoring pipeline exists.)"""
+    demos = [
+        {
+            "email": "dara@demo.local", "name": "Dara Chen",
+            "scores": (4, 5, 4, 4), "review": False, "tab_outs": 0,
+            "rationale": {
+                "technical_skill": "Explained a load-dependent race condition clearly.",
+                "communication": "Natural, specific phrasing.",
+                "problem_solving": "Isolated the fault methodically.",
+                "job_fit": "Relevant backend experience.",
+            },
+        },
+        {
+            "email": "pisey@demo.local", "name": "Sok Pisey",
+            "scores": (3, 2, 3, 3), "review": False, "tab_outs": 4,
+            "rationale": {
+                "technical_skill": "Some gaps in depth.",
+                "communication": "Templated, textbook phrasing detected.",
+                "problem_solving": "Adequate.",
+                "job_fit": "Partial match.",
+            },
+        },
+    ]
+    now = datetime.now(timezone.utc)
+    for d in demos:
+        if db.query(Candidate).filter(Candidate.email == d["email"], Candidate.job_id == job.job_id).first():
+            continue
+        cand = Candidate(job_id=job.job_id, email=d["email"], name=d["name"],
+                         status="completed", consent_at=now, consent_version="v1")
+        db.add(cand)
+        db.commit()
+        db.refresh(cand)
+
+        for i, q in enumerate((job.base_questions or [])[:2], start=1):
+            db.add(Response(candidate_id=cand.candidate_id, job_id=job.job_id, question_id=i,
+                            type="base", status="transcribed",
+                            transcript=f"[demo] answer to question {i}."))
+        ts, comm, ps, jf = d["scores"]
+        db.add(Score(candidate_id=cand.candidate_id, job_id=job.job_id,
+                     technical_skill=ts, communication=comm, problem_solving=ps, job_fit=jf,
+                     rationale=d["rationale"], manual_review_flag=d["review"]))
+        for _ in range(d["tab_outs"]):
+            db.add(AuditLog(candidate_id=cand.candidate_id, job_id=job.job_id,
+                            event_type="TAB_OUT", payload={"seed": True}))
+        db.commit()
+        print(f"Created scored demo candidate: {d['name']}")
 
 
 if __name__ == "__main__":

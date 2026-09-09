@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import get_db
 from app.errors import register_error_handlers
-from app.routers import auth, interview
+from app.routers import auth, interview, recruiter, system
 
 API_PREFIX = "/api/v1"
 
@@ -33,6 +33,8 @@ register_error_handlers(app)
 
 app.include_router(auth.router, prefix=API_PREFIX)
 app.include_router(interview.router, prefix=API_PREFIX)
+app.include_router(system.router, prefix=API_PREFIX)
+app.include_router(recruiter.router, prefix=API_PREFIX)
 
 
 @app.get(f"{API_PREFIX}/health", tags=["system"])

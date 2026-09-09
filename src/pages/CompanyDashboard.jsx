@@ -12,53 +12,32 @@ const menuPanels = {
     { label: 'AI Interview Sets', count: 1 },
     { label: 'AI Interview Candidates', count: 1 },
   ],
-  assessments: [
-    {
-      title: 'CV Evaluation',
-      icon: 'document',
-      items: [
-        { label: 'Dashboard' },
-        { label: 'CV Evaluation Criteria', count: 1 },
-      ],
-    },
-    {
-      title: 'Test',
-      icon: 'clipboard',
-      beta: true,
-      items: [
-        { label: 'Dashboard' },
-        { label: 'Test Sets', count: 1 },
-        { label: 'Test Submissions', count: 1 },
-      ],
-    },
-    {
-      title: 'Chat Screening',
-      icon: 'users',
-      beta: true,
-      items: [
-        { label: 'Dashboard' },
-        { label: 'Chat Screening Sets', count: 1 },
-        { label: 'Chat Screening Responses', count: 1 },
-      ],
-    },
-  ],
-  more: [
-    { label: 'My Candidates', count: 1 },
-    { label: 'My Jobs', count: 1 },
-    { label: 'Careers Page', external: true },
-    { label: 'Referral Community', beta: true },
-  ],
 }
 
 const project = {
+  jobId: 'JOB-AAAI-FE-2026-07',
   name: 'Demo - Marketing & Operation',
   jobPost: 'Demo - Marketing & Operation',
   date: '28 Jul 2026',
   candidates: 4,
+  scoredCandidates: 3,
   assessments: [
     'Demo - AI Interview (Marketing and Operation)',
     'Demo - CV Eval (Marketing and Operation)',
   ],
+}
+
+const authSession = {
+  method: 'Email magic link',
+  role: 'Recruiter',
+  scope: 'Recruiter dashboard only',
+  status: 'Authenticated',
+}
+
+const budgetStatus = {
+  used: 2.34,
+  cap: 10,
+  state: 'Active',
 }
 
 const audioPreviewSrc = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA='
@@ -69,10 +48,17 @@ const rankedCandidates = [
     name: 'Maya Chen',
     role: 'Frontend Engineer',
     aggregate: 4.6,
+    confidence: 'High',
     tabOuts: 0,
     status: 'Shortlist',
     review: false,
     reason: 'Consistent responses and no risk signals.',
+    completedAt: '28 Jul 2026, 10:42 AM',
+    audioResponses: 2,
+    auditEvents: [
+      { type: 'WHISPER_RESPONSE', time: '10:35 AM', detail: 'Base audio transcribed successfully.' },
+      { type: 'GPT_SCORECARD', time: '10:42 AM', detail: 'Schema-validated scorecard persisted.' },
+    ],
     traits: [
       { label: 'Technical Skill', score: 5, rationale: 'Explained React state tradeoffs with concrete examples.' },
       { label: 'Communication', score: 4, rationale: 'Clear, structured answers without sounding scripted.' },
@@ -81,10 +67,14 @@ const rankedCandidates = [
     ],
     transcripts: [
       {
+        type: 'Base question',
+        duration: '1:18',
         question: 'Walk us through a difficult technical problem.',
         text: 'I started by reproducing the issue in a narrow environment, then checked state updates against the network response before changing the component boundary.',
       },
       {
+        type: 'Follow-up',
+        duration: '0:52',
         question: 'What signal would you inspect first?',
         text: 'I would inspect the request lifecycle and compare expected state transitions with what the UI renders after each response.',
       },
@@ -95,10 +85,18 @@ const rankedCandidates = [
     name: 'Rin Sok',
     role: 'Product Designer',
     aggregate: 3.8,
+    confidence: 'Medium',
     tabOuts: 2,
     status: 'Needs Review',
     review: true,
     reason: 'High tab-out count during the follow-up answer.',
+    completedAt: '28 Jul 2026, 11:16 AM',
+    audioResponses: 2,
+    auditEvents: [
+      { type: 'TAB_OUT', time: '11:09 AM', detail: 'Candidate left the question tab during recording.' },
+      { type: 'TAB_OUT', time: '11:12 AM', detail: 'Candidate left the follow-up tab during recording.' },
+      { type: 'GPT_SCORECARD', time: '11:16 AM', detail: 'Manual review flag added from tab-out threshold.' },
+    ],
     traits: [
       { label: 'Technical Skill', score: 3, rationale: 'Understood implementation constraints but stayed high-level.' },
       { label: 'Communication', score: 4, rationale: 'Concise and easy to follow, with clear examples.' },
@@ -107,10 +105,14 @@ const rankedCandidates = [
     ],
     transcripts: [
       {
+        type: 'Base question',
+        duration: '1:04',
         question: 'How do you explain tradeoffs?',
         text: 'I first clarify the customer impact and then show which pieces can safely move later without hiding risk from the team.',
       },
       {
+        type: 'Follow-up',
+        duration: '0:47',
         question: 'What would you inspect first?',
         text: 'I would check where users lose confidence and compare that with the handoff points between design and engineering.',
       },
@@ -121,10 +123,17 @@ const rankedCandidates = [
     name: 'Dara Lim',
     role: 'React Engineer',
     aggregate: 3.1,
+    confidence: 'Low',
     tabOuts: 1,
     status: 'Needs Review',
     review: true,
     reason: 'Communication score is low and transcript contains templated phrasing.',
+    completedAt: '28 Jul 2026, 1:05 PM',
+    audioResponses: 2,
+    auditEvents: [
+      { type: 'TAB_OUT', time: '12:58 PM', detail: 'Candidate left the browser tab once.' },
+      { type: 'GPT_SCORECARD', time: '1:05 PM', detail: 'Robotic-language heuristic triggered in Communication rationale.' },
+    ],
     traits: [
       { label: 'Technical Skill', score: 4, rationale: 'Answered core React lifecycle questions correctly.' },
       { label: 'Communication', score: 2, rationale: 'Repeated rigid transition phrases and sounded memorized.' },
@@ -133,10 +142,14 @@ const rankedCandidates = [
     ],
     transcripts: [
       {
+        type: 'Base question',
+        duration: '0:59',
         question: 'Tell us about debugging with limited information.',
         text: 'Furthermore, I would analyze the problem. In conclusion, the solution requires careful problem solving and teamwork.',
       },
       {
+        type: 'Follow-up',
+        duration: '0:43',
         question: 'What signal would you inspect first?',
         text: 'I would inspect logs, metrics, and user feedback, then apply the best practice solution.',
       },
@@ -261,10 +274,27 @@ function NewProjectModal({ jobTitle, projectName, onJobTitleChange, onProjectNam
   )
 }
 
+function RecruiterMetric({ label, value, detail, icon, tone = '' }) {
+  return (
+    <article className={`recruiter-metric ${tone}`.trim()}>
+      <span className="recruiter-metric-icon">
+        <Icon name={icon} />
+      </span>
+      <div>
+        <span>{label}</span>
+        <strong>{value}</strong>
+        <p>{detail}</p>
+      </div>
+    </article>
+  )
+}
+
 function CandidateDetailDrawer({ candidate, onClose }) {
   if (!candidate) {
     return null
   }
+
+  const reviewReasons = candidate.review ? [candidate.reason] : ['No manual review thresholds crossed.']
 
   return (
     <div className="recruiter-drawer-backdrop" role="presentation" onMouseDown={onClose}>
@@ -282,18 +312,27 @@ function CandidateDetailDrawer({ candidate, onClose }) {
         <header className="drawer-candidate-head">
           <span className="drawer-avatar">{candidate.name.charAt(0)}</span>
           <div>
-            <p className="eyebrow">Candidate scorecard</p>
+            <p className="eyebrow">SRS-FR-14 scorecard detail</p>
             <h2 id="candidate-detail-title">{candidate.name}</h2>
             <p>{candidate.role} - aggregate {candidate.aggregate.toFixed(1)} / 5</p>
           </div>
         </header>
+
+        <div className="drawer-summary-grid" aria-label="Candidate review summary">
+          <span><strong>{candidate.aggregate.toFixed(1)}</strong> Aggregate</span>
+          <span><strong>{candidate.tabOuts}</strong> TAB_OUT</span>
+          <span><strong>{candidate.confidence}</strong> AI confidence</span>
+          <span><strong>{candidate.audioResponses}</strong> Audio files</span>
+        </div>
 
         {candidate.review ? (
           <section className="review-reason">
             <Icon name="flag" />
             <div>
               <strong>Needs manual review</strong>
-              <p>{candidate.reason}</p>
+              {reviewReasons.map((reason) => (
+                <p key={reason}>{reason}</p>
+              ))}
             </div>
           </section>
         ) : null}
@@ -303,21 +342,37 @@ function CandidateDetailDrawer({ candidate, onClose }) {
             <article className="trait-card" key={trait.label}>
               <span>{trait.label}</span>
               <strong>{trait.score}/5</strong>
-              <p>{trait.rationale}</p>
+              <p><b>AI rationale:</b> {trait.rationale}</p>
             </article>
           ))}
         </section>
 
         <section className="transcript-list">
-          <h3>Transcript and audio</h3>
+          <h3>Full transcript and raw audio</h3>
           {candidate.transcripts.map((item, index) => (
             <article className="transcript-card" key={`${candidate.id}-${item.question}`}>
-              <span>Response {index + 1}</span>
+              <div className="transcript-card-meta">
+                <span>{item.type}</span>
+                <small>Response {index + 1} - {item.duration}</small>
+              </div>
               <h4>{item.question}</h4>
               <p>{item.text}</p>
               <audio controls src={audioPreviewSrc}>
                 Audio preview unavailable.
               </audio>
+            </article>
+          ))}
+        </section>
+
+        <section className="audit-trail-list">
+          <h3>Immutable audit trail</h3>
+          {candidate.auditEvents.map((event) => (
+            <article className="audit-trail-row" key={`${candidate.id}-${event.type}-${event.time}`}>
+              <span>{event.type}</span>
+              <div>
+                <strong>{event.time}</strong>
+                <p>{event.detail}</p>
+              </div>
             </article>
           ))}
         </section>
@@ -339,6 +394,8 @@ export default function CompanyDashboard({ user, onBackToLanding }) {
   const profile = user || { name: 'Ben', email: 'ben@gmail.com' }
   const initial = (profile.name || 'B').charAt(0).toUpperCase()
   const organizationLabel = organizationName.trim() || 'KIT'
+  const needsReviewCount = rankedCandidates.filter((candidate) => candidate.review).length
+  const totalTabOuts = rankedCandidates.reduce((sum, candidate) => sum + candidate.tabOuts, 0)
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -391,27 +448,9 @@ export default function CompanyDashboard({ user, onBackToLanding }) {
           >
             AI Interview <Icon name="chevronDown" size={16} />
           </button>
-          <button
-            type="button"
-            className={activeMenu === 'assessments' ? 'company-nav-button active' : 'company-nav-button'}
-            onClick={() => setActiveMenu((current) => (current === 'assessments' ? '' : 'assessments'))}
-          >
-            Other Assessments <Icon name="chevronDown" size={16} />
-          </button>
-          <button
-            type="button"
-            className={activeMenu === 'more' ? 'company-nav-button active' : 'company-nav-button'}
-            onClick={() => setActiveMenu((current) => (current === 'more' ? '' : 'more'))}
-          >
-            More <Icon name="chevronDown" size={16} />
-          </button>
         </nav>
 
         <div className="company-actions">
-          <button type="button" className="quick-tour-button">
-            <Icon name="play" size={17} />
-            Quick Tour
-          </button>
           <button
             type="button"
             className="organization-button"
@@ -473,31 +512,6 @@ export default function CompanyDashboard({ user, onBackToLanding }) {
         </section>
       ) : null}
 
-      {activeMenu === 'assessments' ? (
-        <section className="company-dropdown assessments-dropdown">
-          {menuPanels.assessments.map((group) => (
-            <article className="assessment-menu-group" key={group.title}>
-              <div className="assessment-menu-heading">
-                <Icon name={group.icon} />
-                <span>{group.title}</span>
-                {group.beta ? <span className="beta-chip">Beta</span> : null}
-              </div>
-              {group.items.map((item) => (
-                <DropdownRow item={item} key={item.label} />
-              ))}
-            </article>
-          ))}
-        </section>
-      ) : null}
-
-      {activeMenu === 'more' ? (
-        <section className="company-dropdown more-dropdown">
-          {menuPanels.more.map((item) => (
-            <DropdownRow item={item} key={item.label} />
-          ))}
-        </section>
-      ) : null}
-
       {activeMenu === 'organization' ? (
         <section className="company-dropdown organization-dropdown">
           <div className="organization-card">
@@ -523,10 +537,14 @@ export default function CompanyDashboard({ user, onBackToLanding }) {
 
       <section className="company-workspace">
         <div className="company-workspace-header">
-          <div>
+          <div className="recruiter-title-block">
+            <p className="eyebrow">Company page</p>
             <h1>
-              All Hiring Projects <CountBadge>1</CountBadge>
+              Recruiter Dashboard <CountBadge>{project.jobId}</CountBadge>
             </h1>
+            <p>
+              <strong>Magic-link access.</strong> Ranked scores, TAB_OUT flags, transcripts, and audio.
+            </p>
           </div>
 
           <div className="project-tabs" role="tablist" aria-label="Project status">
@@ -558,15 +576,111 @@ export default function CompanyDashboard({ user, onBackToLanding }) {
           </div>
         </div>
 
-        <div className="company-benefits" aria-label="Platform benefits">
-          <span><Icon name="briefcase" /> One place for AI interviews, CV evaluation, ATS, and job posts</span>
-          <span><Icon name="users" /> Track every candidate through your hiring stages</span>
-          <span><Icon name="chart" /> AI scores surface the best fits, fast</span>
-        </div>
-
         {projectStatus === 'active' ? (
           <>
+            <section className="recruiter-command-center" aria-label="Recruiter dashboard summary">
+              <div className="budget-guard-card auth-session-card">
+                <div className="auth-session-copy">
+                  <p className="eyebrow">SRS-FR-04</p>
+                  <h2>{authSession.status} recruiter session</h2>
+                  <p>Verified recruiter access.</p>
+                </div>
+                <div>
+                  <dl className="auth-session-list">
+                    <div>
+                      <dt>Method</dt>
+                      <dd>{authSession.method}</dd>
+                    </div>
+                    <div>
+                      <dt>Role</dt>
+                      <dd>{authSession.role}</dd>
+                    </div>
+                    <div>
+                      <dt>Scope</dt>
+                      <dd>{authSession.scope}</dd>
+                    </div>
+                  </dl>
+                </div>
+              </div>
+
+              <div className="recruiter-metrics-grid">
+                <RecruiterMetric label="Scorecards" value={rankedCandidates.length} detail="Saved" icon="chart" />
+                <RecruiterMetric label="Review" value={needsReviewCount} detail="Flagged" icon="flag" tone="warning" />
+                <RecruiterMetric label="TAB_OUT" value={totalTabOuts} detail="Events" icon="shield" />
+                <RecruiterMetric label="Audio" value={rankedCandidates.reduce((sum, candidate) => sum + candidate.audioResponses, 0)} detail="Files" icon="mic" />
+              </div>
+            </section>
+
+            <section className="recruiter-scoreboard">
+              <header className="scoreboard-header">
+                <div>
+                  <p className="eyebrow">SRS-FR-14 / SRS-FR-15</p>
+                  <h2>Candidate leaderboard</h2>
+                  <p>Score, TAB_OUT, review flag, transcript, and audio.</p>
+                  <div className="scoreboard-summary-list" aria-label="Recruiter review capabilities">
+                    <span><strong>Name</strong></span>
+                    <span><strong>Score</strong></span>
+                    <span><strong>TAB_OUT</strong></span>
+                    <span><strong>Review</strong></span>
+                  </div>
+                </div>
+                <div className="budget-meter" aria-label="Budget monitor">
+                  <span>Budget</span>
+                  <strong>${budgetStatus.used.toFixed(2)} / ${budgetStatus.cap.toFixed(2)}</strong>
+                  <small>{budgetStatus.state}</small>
+                </div>
+              </header>
+
+              <div className="leaderboard-toolbar">
+                <label htmlFor="jobFilter">
+                  Job_ID
+                  <select id="jobFilter" value={project.jobId} onChange={() => {}}>
+                    <option>{project.jobId}</option>
+                  </select>
+                </label>
+                <span><strong>{rankedCandidates.length}</strong> ranked</span>
+              </div>
+
+              <div className="leaderboard-table" role="table" aria-label="Ranked candidate leaderboard">
+                <div className="leaderboard-head" role="row">
+                  <span role="columnheader">Rank</span>
+                  <span role="columnheader">Candidate</span>
+                  <span role="columnheader">Score</span>
+                  <span role="columnheader">Tab outs</span>
+                  <span role="columnheader">Review</span>
+                  <span role="columnheader">Completed</span>
+                  <span role="columnheader">Action</span>
+                </div>
+                {rankedCandidates.map((candidate, index) => (
+                  <article className={candidate.review ? 'leaderboard-row flagged' : 'leaderboard-row'} role="row" key={candidate.id}>
+                    <span className="rank-number" role="cell">{index + 1}</span>
+                    <div role="cell">
+                      <strong>{candidate.name}</strong>
+                      <p>{candidate.role}</p>
+                    </div>
+                    <span className="score-pill" role="cell">{candidate.aggregate.toFixed(1)} / 5</span>
+                    <span className="tabout-pill" role="cell">{candidate.tabOuts}</span>
+                    <span className={candidate.review ? 'review-chip danger' : 'review-chip'} role="cell">
+                      <Icon name={candidate.review ? 'flag' : 'check'} size={15} />
+                      {candidate.status}
+                    </span>
+                    <span className="completed-cell" role="cell">{candidate.completedAt}</span>
+                    <button type="button" className="company-secondary-button compact" onClick={() => setSelectedCandidate(candidate)}>
+                      Review
+                    </button>
+                  </article>
+                ))}
+              </div>
+            </section>
+
             <section className="project-table-card">
+              <header className="project-overview-header">
+                <div>
+                  <p className="eyebrow">Project overview</p>
+                  <h2>Hiring project setup</h2>
+                </div>
+                <span>{project.assessments.length + 1} steps</span>
+              </header>
               <div className="project-table-head">
                 <span>Hiring project</span>
                 <span>Status</span>
@@ -579,6 +693,7 @@ export default function CompanyDashboard({ user, onBackToLanding }) {
               <article className="project-row">
                 <div>
                   <h2>{project.name}</h2>
+                  <p>Job_ID: {project.jobId}</p>
                   <p>Job Post: <span className="online-dot" /> {project.jobPost}</p>
                   <small>{project.date}</small>
                 </div>
@@ -596,7 +711,7 @@ export default function CompanyDashboard({ user, onBackToLanding }) {
                   <small>+1 more</small>
                 </div>
                 <div className="candidate-count">
-                  <strong>{rankedCandidates.length}</strong>
+                  <strong>{project.scoredCandidates}</strong>
                   <span className="new-chip">+1 New</span>
                 </div>
                 <button
@@ -608,74 +723,11 @@ export default function CompanyDashboard({ user, onBackToLanding }) {
                   <Icon name="moreVertical" />
                 </button>
               </article>
-
-              <button type="button" className="new-project-row" onClick={() => setIsNewProjectOpen(true)}>
-                <Icon name="plus" />
-                <span>
-                  <strong>New Hiring Project</strong>
-                  <small>Create a hiring project to start screening candidates and get instant CV and interview evaluations.</small>
-                </span>
-              </button>
-            </section>
-
-            <section className="recruiter-scoreboard">
-              <header className="scoreboard-header">
-                <div>
-                  <p className="eyebrow">SRS-FR-14 leaderboard</p>
-                  <h2>Ranked candidate results</h2>
-                  <p>Scores, tab-out signals, review flags, transcripts, and audio playback stay visible in one review surface.</p>
-                </div>
-                <div className="budget-meter" aria-label="Budget monitor">
-                  <span>AI budget</span>
-                  <strong>$2.34 / $10.00</strong>
-                  <small>Active - local demo data</small>
-                </div>
-              </header>
-
-              <div className="leaderboard-table" role="table" aria-label="Ranked candidate leaderboard">
-                <div className="leaderboard-head" role="row">
-                  <span role="columnheader">Rank</span>
-                  <span role="columnheader">Candidate</span>
-                  <span role="columnheader">Score</span>
-                  <span role="columnheader">Tab outs</span>
-                  <span role="columnheader">Review</span>
-                  <span role="columnheader">Action</span>
-                </div>
-                {rankedCandidates.map((candidate, index) => (
-                  <article className={candidate.review ? 'leaderboard-row flagged' : 'leaderboard-row'} role="row" key={candidate.id}>
-                    <span className="rank-number" role="cell">{index + 1}</span>
-                    <div role="cell">
-                      <strong>{candidate.name}</strong>
-                      <p>{candidate.role}</p>
-                    </div>
-                    <span className="score-pill" role="cell">{candidate.aggregate.toFixed(1)} / 5</span>
-                    <span className="tabout-pill" role="cell">{candidate.tabOuts}</span>
-                    <span className={candidate.review ? 'review-chip danger' : 'review-chip'} role="cell">
-                      <Icon name={candidate.review ? 'flag' : 'check'} size={15} />
-                      {candidate.status}
-                    </span>
-                    <button type="button" className="company-secondary-button compact" onClick={() => setSelectedCandidate(candidate)}>
-                      Review
-                    </button>
-                  </article>
-                ))}
-              </div>
             </section>
           </>
         ) : (
           <EmptyProjects type={projectStatus} />
         )}
-      </section>
-
-      <section className="product-update-card">
-        <Icon name="spark" />
-        <div>
-          <strong>Product Updates <span>3</span></strong>
-          <p>3 releases this week</p>
-        </div>
-        <button type="button" aria-label="Dismiss product updates">
-          <Icon name="close" size={14} />
-        </button>
       </section>
 
       <button type="button" className="company-help-button" aria-label="Help">

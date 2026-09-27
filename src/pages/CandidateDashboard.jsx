@@ -12,16 +12,22 @@ const appliedJobs = [
   { role: 'UX Researcher', company: 'DataViz Inc', applied: 'Jul 10, 2026', status: 'Interview Scheduled', tone: 'info' },
 ]
 
-const notifications = [
+const initialNotifications = [
   {
+    id: 'profile-viewed',
     dot: 'blue',
     title: 'Your profile was viewed by TechCorp Asia',
+    message: 'TechCorp Asia opened your private introduction and CV summary. Your contact details remain private until you choose to respond.',
     time: '2 hours ago',
+    unread: true,
   },
   {
+    id: 'frontend-match',
     dot: 'green',
     title: 'New job match: Frontend Developer',
+    message: 'A Frontend Developer role matches your profile preferences. Review the match from Applied Jobs or keep your profile updated for stronger recommendations.',
     time: '5 hours ago',
+    unread: true,
   },
 ]
 
@@ -473,7 +479,10 @@ function InterviewWorkspace({ candidateName, onClose }) {
               <Icon name="check" size={34} />
             </span>
             <p className="eyebrow">Interview complete</p>
-            <h1 id="interview-title">Thank you, {candidateName}.</h1>
+            <h1 id="interview-title">
+              Thank you,
+              <span className="completion-name">{candidateName}.</span>
+            </h1>
             <p>
               Your base answers and follow-up response have been submitted. The recruiter dashboard will show the
               transcript, scoring rationale, TAB_OUT count, and audio playback when processing finishes.
@@ -870,9 +879,13 @@ export default function CandidateDashboard({ user, onOpenLogin, onOpenSignup, on
   const [isInterviewOpen, setIsInterviewOpen] = useState(false)
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
   const [isProfileOpen, setIsProfileOpen] = useState(false)
+  const [notificationItems, setNotificationItems] = useState(initialNotifications)
+  const [selectedNotificationId, setSelectedNotificationId] = useState('')
   const profile = user || { name: 'Ben', email: 'ben@gmail.com' }
   const firstName = profile.name.split(' ')[0] || 'Ben'
   const initial = firstName.charAt(0).toUpperCase()
+  const unreadNotificationCount = notificationItems.filter((item) => item.unread).length
+  const selectedNotification = notificationItems.find((item) => item.id === selectedNotificationId)
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -892,6 +905,15 @@ export default function CandidateDashboard({ user, onOpenLogin, onOpenSignup, on
   const startInterview = () => {
     setIsPracticeOpen(false)
     setIsInterviewOpen(true)
+  }
+  const handleOpenNotification = (id) => {
+    setSelectedNotificationId(id)
+    setNotificationItems((current) => current.map((item) => (
+      item.id === id ? { ...item, unread: false } : item
+    )))
+  }
+  const handleMarkAllNotificationsRead = () => {
+    setNotificationItems((current) => current.map((item) => ({ ...item, unread: false })))
   }
 
   const renderContent = () => {
@@ -998,21 +1020,36 @@ export default function CandidateDashboard({ user, onOpenLogin, onOpenSignup, on
               }}
             >
               <Icon name="bell" />
-              <span className="action-badge">2</span>
+              {unreadNotificationCount ? <span className="action-badge">{unreadNotificationCount}</span> : null}
             </button>
             {isNotificationsOpen ? (
               <section className="notifications-popover" aria-label="Notifications">
-                <h2>Notifications</h2>
-                {notifications.map((item) => (
-                  <article className="notification-item" key={item.title}>
-                    <span className={`notification-dot ${item.dot}`} />
+                <div className="notifications-head">
+                  <h2>Notifications</h2>
+                  <span>{unreadNotificationCount} unread</span>
+                </div>
+                {notificationItems.map((item) => (
+                  <button
+                    type="button"
+                    className={item.unread ? 'notification-item unread' : 'notification-item'}
+                    onClick={() => handleOpenNotification(item.id)}
+                    key={item.id}
+                  >
+                    <span className={item.unread ? `notification-dot ${item.dot}` : 'notification-dot read'} />
                     <div>
                       <p>{item.title}</p>
                       <small>{item.time}</small>
                     </div>
-                  </article>
+                  </button>
                 ))}
-                <button type="button" className="popover-link">
+                {selectedNotification ? (
+                  <article className="notification-detail" aria-live="polite">
+                    <strong>{selectedNotification.title}</strong>
+                    <p>{selectedNotification.message}</p>
+                    <small>{selectedNotification.time}</small>
+                  </article>
+                ) : null}
+                <button type="button" className="popover-link" onClick={handleMarkAllNotificationsRead}>
                   Mark all as read
                 </button>
               </section>

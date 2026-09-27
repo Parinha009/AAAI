@@ -125,11 +125,6 @@ export default function Landing({
   const handleContinue = (role) => {
     setIsDialogOpen(false)
 
-    if (currentUser) {
-      onGetStarted()
-      return
-    }
-
     if (role === 'company') {
       onChooseCompany()
       return

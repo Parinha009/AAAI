@@ -231,9 +231,25 @@ export default function App() {
     setToast(null)
   }
 
-  const handleChooseCompany = () => openLogin({ role: 'company' })
+  const handleChooseCompany = () => {
+    if (currentUser) {
+      setCurrentRole('company')
+      setMode('company')
+      return
+    }
 
-  const handleChooseCandidate = () => openLogin({ role: 'candidate' })
+    openLogin({ role: 'company' })
+  }
+
+  const handleChooseCandidate = () => {
+    if (currentUser) {
+      setCurrentRole('candidate')
+      setMode('candidate')
+      return
+    }
+
+    openLogin({ role: 'candidate' })
+  }
 
   const handleGetStarted = () => {
     if (!currentUser) {
@@ -282,6 +298,7 @@ export default function App() {
         <CompanyDashboard
           user={currentUser}
           onBackToLanding={handleGoLanding}
+          onOpenLogin={() => openLogin({ role: 'company' })}
         />
       ) : mode === 'candidate' ? (
         <CandidateDashboard

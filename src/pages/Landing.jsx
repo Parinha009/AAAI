@@ -71,21 +71,22 @@ const roleOptions = [
   {
     id: 'company',
     title: 'Company / Recruiter',
-    description: 'Review candidates, scoring, budgets, and interview signals.',
-    action: 'Company sign in',
+    description: 'Manage projects, candidates, scorecards, and interview signals.',
+    action: 'Continue as company',
     icon: 'company',
   },
   {
     id: 'candidate',
     title: 'Candidate / Job Seeker',
-    description: 'Complete your profile, practice answers, and track your interview status.',
-    action: 'Candidate sign in',
+    description: 'Open your profile, practice space, and interview workflow.',
+    action: 'Continue as candidate',
     icon: 'candidate',
   },
 ]
 
 export default function Landing({
   currentUser,
+  currentRole = 'candidate',
   onGoToLogin,
   onGoToSignup,
   onChooseCompany,
@@ -93,11 +94,11 @@ export default function Landing({
   onGetStarted,
 }) {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [selectedRole, setSelectedRole] = useState('candidate')
   const [activePanel, setActivePanel] = useState('')
   const headerRef = useRef(null)
   const firstName = currentUser?.name?.split(' ')[0] || 'Account'
   const initial = firstName.charAt(0).toUpperCase()
+  const profileRoleLabel = currentRole === 'company' ? 'Company' : 'Candidate'
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -121,8 +122,13 @@ export default function Landing({
     }
   }, [])
 
-  const handleContinue = (role = selectedRole) => {
+  const handleContinue = (role) => {
     setIsDialogOpen(false)
+
+    if (currentUser) {
+      onGetStarted()
+      return
+    }
 
     if (role === 'company') {
       onChooseCompany()
@@ -172,10 +178,10 @@ export default function Landing({
                   <span className="avatar">{initial}</span>
                   <div>
                     <strong>{firstName}</strong>
-                    <small>{currentUser.email}</small>
+                    <small>{profileRoleLabel} - {currentUser.email}</small>
                   </div>
                 </div>
-                <button type="button" className="solid-button small" onClick={onGetStarted}>
+                <button type="button" className="solid-button small" onClick={() => setIsDialogOpen(true)}>
                   <span>Get Started</span>
                   <Icon name="arrowRight" />
                 </button>
@@ -214,6 +220,15 @@ export default function Landing({
       </div>
 
       <section className="landing-hero" aria-labelledby="hero-title">
+        <div className="landing-live-background" aria-hidden="true">
+          <span className="live-orb live-orb-one" />
+          <span className="live-orb live-orb-two" />
+          <span className="live-beam live-beam-one" />
+          <span className="live-beam live-beam-two" />
+          <span className="live-node live-node-one" />
+          <span className="live-node live-node-two" />
+          <span className="live-node live-node-three" />
+        </div>
         <div className="hero-copy">
           <p className="eyebrow">AI interview and CV screener</p>
           <h1 id="hero-title">AI Interview &amp; CV Screener</h1>
@@ -223,7 +238,7 @@ export default function Landing({
           </p>
 
           <div className="hero-actions">
-            <button type="button" className="solid-button" onClick={currentUser ? onGetStarted : () => setIsDialogOpen(true)}>
+            <button type="button" className="solid-button" onClick={() => setIsDialogOpen(true)}>
               {currentUser ? 'Go to workspace' : 'Start free'}
             </button>
             {currentUser ? null : (
@@ -358,33 +373,26 @@ export default function Landing({
             onMouseDown={(event) => event.stopPropagation()}
           >
             <div className="dialog-header dialog-header-center">
-              <h2 id="role-dialog-title">What best describes you?</h2>
+              <p className="eyebrow">Choose workspace</p>
+              <h2 id="role-dialog-title">Where should AAAI take you?</h2>
               <button type="button" className="icon-only-button" onClick={() => setIsDialogOpen(false)} aria-label="Close dialog">
                 <Icon name="close" />
               </button>
             </div>
 
-            <div className="role-card-grid">
+            <div className="role-choice-list">
               {roleOptions.map((option) => (
-                <article
-                  className={selectedRole === option.id ? 'role-choice-card selected' : 'role-choice-card'}
-                  key={option.id}
-                >
+                <article className="role-choice-row" key={option.id}>
+                  <span className="role-choice-icon" aria-hidden="true">
+                    <Icon name={option.icon} size={22} />
+                  </span>
+                  <div className="role-choice-copy">
+                    <h3>{option.title}</h3>
+                    <p>{option.description}</p>
+                  </div>
                   <button
                     type="button"
-                    className="role-choice-main"
-                    onClick={() => setSelectedRole(option.id)}
-                    aria-pressed={selectedRole === option.id}
-                  >
-                    <span className="role-mark large" aria-hidden="true">
-                      <Icon name={option.icon} />
-                    </span>
-                    <strong>{option.title}</strong>
-                    <small>{option.description}</small>
-                  </button>
-                  <button
-                    type="button"
-                    className="solid-button full-width"
+                    className="role-signin-button"
                     onClick={() => handleContinue(option.id)}
                   >
                     <span>{option.action}</span>
@@ -392,13 +400,6 @@ export default function Landing({
                   </button>
                 </article>
               ))}
-            </div>
-
-            <div className="modal-footer-line">
-              <p>Choose one path to continue.</p>
-              <button type="button" className="soft-button" onClick={() => handleContinue()}>
-                Continue
-              </button>
             </div>
           </section>
         </div>

@@ -6,12 +6,12 @@ import Landing from './pages/Landing'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 
-const existingAccounts = new Map([
-  ['alex@aaai.ai', ''],
-  ['demo@aaai.ai', ''],
-  ['candidate@example.com', ''],
-  ['recruiter@example.com', ''],
-  ['ben@gmail.com', 'ben'],
+const existingAccounts = new Set([
+  'alex@aaai.ai',
+  'demo@aaai.ai',
+  'candidate@example.com',
+  'recruiter@example.com',
+  'ben@gmail.com',
 ])
 
 const accountProfiles = new Map([
@@ -25,8 +25,6 @@ const accountProfiles = new Map([
 const emptyForm = {
   fullName: '',
   email: '',
-  password: '',
-  confirmPassword: '',
   acceptTerms: false,
 }
 
@@ -59,9 +57,7 @@ export default function App() {
   const [mode, setMode] = useState('landing')
   const [authRole, setAuthRole] = useState('candidate')
   const [formData, setFormData] = useState(emptyForm)
-  const [loginStep, setLoginStep] = useState('email')
-  const [confirmedEmail, setConfirmedEmail] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
+  const [magicLinkRequest, setMagicLinkRequest] = useState(null)
   const [loadingAction, setLoadingAction] = useState('')
   const [authNotice, setAuthNotice] = useState('')
   const [toast, setToast] = useState(null)
@@ -88,23 +84,21 @@ export default function App() {
 
   const resetForm = (overrides = {}) => {
     setFormData({ ...emptyForm, ...overrides })
-    setShowPassword(false)
   }
 
   const openLogin = ({ email = '', role = authRole } = {}) => {
     setMode('login')
     setAuthRole(role)
-    setLoginStep('email')
-    setConfirmedEmail('')
+    setMagicLinkRequest(null)
     setAuthNotice('')
     resetForm({ email })
   }
 
-  const openSignup = ({ email = '', notice = '' } = {}) => {
+  const openSignup = ({ email = '', notice = '', role = authRole } = {}) => {
     setMode('signup')
+    setAuthRole(role)
     setAuthNotice(notice)
-    setLoginStep('email')
-    setConfirmedEmail('')
+    setMagicLinkRequest(null)
     resetForm({ email })
   }
 
@@ -116,7 +110,7 @@ export default function App() {
     }))
   }
 
-  const handleVerifyEmail = (event) => {
+  const handleRequestMagicLink = (event) => {
     event.preventDefault()
     const email = normalizeEmail(formData.email)
 
@@ -126,69 +120,29 @@ export default function App() {
       return
     }
 
-    setLoadingAction('verifyEmail')
+    setLoadingAction('magicLink')
     setAuthNotice('')
 
     window.setTimeout(() => {
-      if (existingAccounts.has(email)) {
-        setConfirmedEmail(email)
-        setLoginStep('password')
-        setFormData((current) => ({ ...current, email, password: '' }))
-        setAuthNotice('Email verified. Welcome back.')
-        showToast('success', 'Email verified', 'Welcome back. Continue with your password.')
-      } else {
-        openSignup({
-          email,
-          notice: "We couldn't find an account with this email. Let's create one.",
-        })
-        showToast('info', 'New account ready', "We couldn't find that email, so we started a clean signup for you.")
-      }
+      setFormData((current) => ({ ...current, email }))
+      setMagicLinkRequest({
+        email,
+        role: authRole,
+        source: 'login',
+      })
+      setAuthNotice('If that email is registered, a sign-in link is on its way.')
+      showToast('success', 'Magic link sent', `Check ${email} for your secure sign-in link.`)
 
       setLoadingAction('')
     }, 650)
   }
 
-  const handleLogin = (event) => {
-    event.preventDefault()
-
-    if (!formData.password.trim()) {
-      setAuthNotice('Enter your password to continue.')
-      showToast('error', 'Password required', 'Your account is ready after you enter your password.')
-      return
-    }
-
-    setLoadingAction('login')
-    setAuthNotice('')
-
-    window.setTimeout(() => {
-      const savedPassword = existingAccounts.get(confirmedEmail)
-
-      if (
-        (savedPassword && formData.password.trim() !== savedPassword)
-        || (!savedPassword && formData.password.trim().toLowerCase() === 'wrong')
-      ) {
-        setAuthNotice('Invalid password. Try again or reset it.')
-        showToast('error', 'Invalid password', 'That password did not match this account.')
-        setLoadingAction('')
-        return
-      }
-
-      showToast('success', 'Welcome back', 'Your profile is now on the home page.')
-      setCurrentUser(accountProfiles.get(confirmedEmail) || { name: 'Candidate', email: confirmedEmail })
-      setCurrentRole(authRole === 'company' ? 'company' : 'candidate')
-      resetForm()
-      setConfirmedEmail('')
-      setLoginStep('email')
-      setMode('landing')
-      setLoadingAction('')
-    }, 700)
-  }
-
   const handleSignup = (event) => {
     event.preventDefault()
+    const fullName = formData.fullName.trim()
     const email = normalizeEmail(formData.email)
 
-    if (!formData.fullName.trim()) {
+    if (!fullName) {
       setAuthNotice('Add your full name so your profile feels complete.')
       showToast('error', 'Full name required', 'Add the name you want hiring teams to see.')
       return
@@ -200,25 +154,9 @@ export default function App() {
       return
     }
 
-    if (existingAccounts.has(email)) {
-      setMode('login')
-      setConfirmedEmail(email)
-      setLoginStep('password')
-      setAuthNotice('Email already registered. Continue with your password.')
-      setFormData({ ...emptyForm, email })
-      showToast('warning', 'Email already registered', 'We found your account and moved you to sign in.')
-      return
-    }
-
-    if (formData.password.length < 8) {
-      setAuthNotice('Use at least 8 characters for your password.')
-      showToast('error', 'Password too short', 'Choose a password with 8 or more characters.')
-      return
-    }
-
-    if (formData.password !== formData.confirmPassword) {
-      setAuthNotice("Those passwords don't match yet.")
-      showToast('error', 'Passwords do not match', 'Check both password fields and try again.')
+    if (!formData.acceptTerms) {
+      setAuthNotice('Accept the screening terms before we email your sign-in link.')
+      showToast('error', 'Terms required', 'Confirm the screening terms to finish account setup.')
       return
     }
 
@@ -226,37 +164,65 @@ export default function App() {
     setAuthNotice('')
 
     window.setTimeout(() => {
-      showToast('success', 'Account created successfully', 'Your profile is now on the home page.')
-      setCurrentUser({ name: formData.fullName.trim(), email })
-      setCurrentRole(authRole === 'company' ? 'company' : 'candidate')
-      resetForm()
-      setMode('landing')
+      setFormData((current) => ({ ...current, email, fullName }))
+      setMagicLinkRequest({
+        email,
+        name: fullName,
+        role: authRole,
+        source: 'signup',
+      })
+      setAuthNotice('Check your inbox to finish signing in. No password is required.')
+      showToast('success', 'Magic link sent', `Check ${email} to verify your account.`)
       setLoadingAction('')
     }, 760)
   }
 
-  const handleForgetPassword = () => {
-    const email = confirmedEmail || normalizeEmail(formData.email)
+  const handleResendMagicLink = () => {
+    const email = magicLinkRequest?.email || normalizeEmail(formData.email)
 
     if (!email) {
-      setAuthNotice('Enter your email first so we can send a reset link.')
-      showToast('info', 'Email first', 'Tell us which account needs a reset link.')
+      setAuthNotice('Enter your email first so we can send a sign-in link.')
+      showToast('info', 'Email first', 'Tell us where to send the sign-in link.')
       return
     }
 
-    setLoadingAction('resetPassword')
+    setLoadingAction('resendMagicLink')
 
     window.setTimeout(() => {
-      showToast('success', 'Reset link sent', `Check ${email} for a secure reset link.`)
+      showToast('success', 'Magic link resent', `Check ${email} for the newest sign-in link.`)
       setLoadingAction('')
     }, 520)
   }
 
-  const handleChangeEmail = () => {
-    setLoginStep('email')
-    setConfirmedEmail('')
+  const handleChangeAuthEmail = () => {
+    setMagicLinkRequest(null)
     setAuthNotice('')
-    setFormData((current) => ({ ...current, password: '' }))
+  }
+
+  const handleOpenMagicLink = () => {
+    if (!magicLinkRequest) {
+      return
+    }
+
+    const email = magicLinkRequest.email
+    const knownProfile = accountProfiles.get(email)
+    const fallbackName = magicLinkRequest.name || (existingAccounts.has(email) ? 'Candidate' : email.split('@')[0])
+    const profile = knownProfile || {
+      name: fallbackName,
+      email,
+    }
+
+    if (!existingAccounts.has(email)) {
+      existingAccounts.add(email)
+    }
+    accountProfiles.set(email, profile)
+
+    setCurrentUser(profile)
+    setCurrentRole(magicLinkRequest.role === 'company' ? 'company' : 'candidate')
+    showToast('success', 'Signed in', 'Your magic link was verified.')
+    resetForm()
+    setMagicLinkRequest(null)
+    setMode('landing')
   }
 
   const handleGoLanding = () => {
@@ -282,33 +248,35 @@ export default function App() {
     <>
       {mode === 'login' ? (
         <Login
-          confirmedEmail={confirmedEmail}
+          authRole={authRole}
           formData={formData}
           isLoading={Boolean(loadingAction)}
           loadingAction={loadingAction}
-          loginStep={loginStep}
+          magicLinkRequest={magicLinkRequest}
           notice={authNotice}
           onChange={handleChange}
-          onChangeEmail={handleChangeEmail}
-          onForgetPassword={handleForgetPassword}
+          onChangeEmail={handleChangeAuthEmail}
           onGoToLanding={handleGoLanding}
-          onLogin={handleLogin}
-          onSwitchToSignup={() => openSignup({ email: formData.email })}
-          onTogglePassword={() => setShowPassword((current) => !current)}
-          onVerifyEmail={handleVerifyEmail}
-          showPassword={showPassword}
+          onOpenMagicLink={handleOpenMagicLink}
+          onResendMagicLink={handleResendMagicLink}
+          onSwitchToSignup={() => openSignup({ email: formData.email, role: authRole })}
+          onSubmit={handleRequestMagicLink}
         />
       ) : mode === 'signup' ? (
         <Signup
+          authRole={authRole}
           formData={formData}
           isLoading={loadingAction === 'signup'}
+          loadingAction={loadingAction}
+          magicLinkRequest={magicLinkRequest}
           notice={authNotice}
           onChange={handleChange}
+          onChangeEmail={handleChangeAuthEmail}
           onGoToLanding={handleGoLanding}
+          onOpenMagicLink={handleOpenMagicLink}
+          onResendMagicLink={handleResendMagicLink}
           onSubmit={handleSignup}
           onSwitchToLogin={() => openLogin({ email: formData.email, role: authRole })}
-          onTogglePassword={() => setShowPassword((current) => !current)}
-          showPassword={showPassword}
         />
       ) : mode === 'company' ? (
         <CompanyDashboard
@@ -320,11 +288,12 @@ export default function App() {
           user={currentUser}
           onBackToLanding={handleGoLanding}
           onOpenLogin={() => openLogin({ role: 'candidate' })}
-          onOpenSignup={() => openSignup()}
+          onOpenSignup={() => openSignup({ role: 'candidate' })}
         />
       ) : (
         <Landing
           currentUser={currentUser}
+          currentRole={currentRole}
           onChooseCandidate={handleChooseCandidate}
           onChooseCompany={handleChooseCompany}
           onGoToLogin={() => openLogin()}

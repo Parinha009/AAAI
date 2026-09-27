@@ -1,5 +1,10 @@
 import AuthShell from '../components/AuthShell'
 
+const roleLabels = {
+  candidate: 'Candidate workspace',
+  company: 'Company workspace',
+}
+
 function LoadingLabel({ isLoading, label, loadingLabel }) {
   return (
     <>
@@ -10,23 +15,22 @@ function LoadingLabel({ isLoading, label, loadingLabel }) {
 }
 
 export default function Login({
-  confirmedEmail,
+  authRole,
   formData,
   isLoading,
   loadingAction,
-  loginStep,
+  magicLinkRequest,
   notice,
   onChange,
   onChangeEmail,
-  onForgetPassword,
   onGoToLanding,
-  onLogin,
+  onOpenMagicLink,
+  onResendMagicLink,
   onSwitchToSignup,
-  onTogglePassword,
-  onVerifyEmail,
-  showPassword,
+  onSubmit,
 }) {
-  const isEmailStep = loginStep === 'email'
+  const isLinkSent = Boolean(magicLinkRequest)
+  const selectedRole = magicLinkRequest?.role || authRole
 
   return (
     <AuthShell
@@ -36,19 +40,56 @@ export default function Login({
       onSwitchToSignup={onSwitchToSignup}
     >
       <header className="auth-header">
-        <p className="eyebrow">{isEmailStep ? 'Secure sign in' : 'Welcome back'}</p>
-        <h1>{isEmailStep ? 'Start with your email.' : 'Continue with your password.'}</h1>
+        <p className="eyebrow">{isLinkSent ? 'Check your inbox' : 'Passwordless sign in'}</p>
+        <h1>{isLinkSent ? 'Your magic link is on its way.' : 'Sign in with one emailed link.'}</h1>
         <p>
-          {isEmailStep
-            ? 'We will check whether your account exists before asking for anything else.'
-            : 'Your email is verified. Enter your password to open your workspace.'}
+          {isLinkSent
+            ? 'Open the link from your email to verify this browser and continue into AAAI.'
+            : 'Enter your email and AAAI will send a secure link. No password is created or stored.'}
         </p>
       </header>
 
       {notice ? <p className="auth-notice">{notice}</p> : null}
 
-      {isEmailStep ? (
-        <form className="auth-form" onSubmit={onVerifyEmail}>
+      {isLinkSent ? (
+        <div className="auth-form">
+          <section className="magic-link-card" aria-label="Magic link sent">
+            <div className="magic-link-icon" aria-hidden="true">@</div>
+            <div>
+              <strong>Sent to {magicLinkRequest.email}</strong>
+              <p>
+                {roleLabels[selectedRole]} access is attached to this link.{' '}
+                Magic links expire after a short window and can only be used once. This demo includes a local
+                verification button in place of an email inbox.
+              </p>
+            </div>
+          </section>
+
+          <button
+            type="button"
+            className="submit-button"
+            onClick={onOpenMagicLink}
+          >
+            Open demo magic link
+          </button>
+
+          <div className="auth-link-actions">
+            <button
+              type="button"
+              className="text-link"
+              onClick={onResendMagicLink}
+              disabled={isLoading}
+              aria-busy={loadingAction === 'resendMagicLink'}
+            >
+              {loadingAction === 'resendMagicLink' ? 'Resending link...' : 'Resend link'}
+            </button>
+            <button type="button" className="text-link" onClick={onChangeEmail}>
+              Use another email
+            </button>
+          </div>
+        </div>
+      ) : (
+        <form className="auth-form" onSubmit={onSubmit}>
           <label className="field-group" htmlFor="login-email">
             <span>Email</span>
             <input
@@ -66,69 +107,14 @@ export default function Login({
           <button
             type="submit"
             className="submit-button"
-            disabled={loadingAction === 'verifyEmail'}
-            aria-busy={loadingAction === 'verifyEmail'}
+            disabled={loadingAction === 'magicLink'}
+            aria-busy={loadingAction === 'magicLink'}
           >
             <LoadingLabel
-              isLoading={loadingAction === 'verifyEmail'}
-              label="Continue"
-              loadingLabel="Checking email"
+              isLoading={loadingAction === 'magicLink'}
+              label="Send magic link"
+              loadingLabel="Sending link"
             />
-          </button>
-        </form>
-      ) : (
-        <form className="auth-form" onSubmit={onLogin}>
-          <div className="confirmed-email">
-            <div>
-              <span className="confirmed-label">Signed in as</span>
-              <strong>{confirmedEmail}</strong>
-            </div>
-            <button type="button" className="inline-button" onClick={onChangeEmail}>
-              Change email
-            </button>
-          </div>
-
-          <label className="field-group" htmlFor="login-password">
-            <span>Password</span>
-            <div className="password-row">
-              <input
-                id="login-password"
-                name="password"
-                type={showPassword ? 'text' : 'password'}
-                placeholder="Enter your password"
-                value={formData.password}
-                onChange={onChange}
-                autoComplete="current-password"
-                autoFocus
-              />
-              <button
-                type="button"
-                className="reveal-button"
-                onClick={onTogglePassword}
-                aria-label={showPassword ? 'Hide password' : 'Show password'}
-              >
-                {showPassword ? 'Hide' : 'Show'}
-              </button>
-            </div>
-          </label>
-
-          <button
-            type="button"
-            className="text-link"
-            onClick={onForgetPassword}
-            disabled={isLoading}
-            aria-busy={loadingAction === 'resetPassword'}
-          >
-            {loadingAction === 'resetPassword' ? 'Sending reset link...' : 'Forgot password?'}
-          </button>
-
-          <button
-            type="submit"
-            className="submit-button"
-            disabled={loadingAction === 'login'}
-            aria-busy={loadingAction === 'login'}
-          >
-            <LoadingLabel isLoading={loadingAction === 'login'} label="Log in" loadingLabel="Opening workspace" />
           </button>
         </form>
       )}

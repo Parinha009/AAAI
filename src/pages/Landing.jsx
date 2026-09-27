@@ -92,9 +92,11 @@ export default function Landing({
   onChooseCompany,
   onChooseCandidate,
   onGetStarted,
+  onLogout,
 }) {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [activePanel, setActivePanel] = useState('')
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
   const headerRef = useRef(null)
   const firstName = currentUser?.name?.split(' ')[0] || 'Account'
   const initial = firstName.charAt(0).toUpperCase()
@@ -105,12 +107,14 @@ export default function Landing({
       if (event.key === 'Escape') {
         setIsDialogOpen(false)
         setActivePanel('')
+        setIsProfileMenuOpen(false)
       }
     }
 
     const handlePointerDown = (event) => {
       if (headerRef.current && !headerRef.current.contains(event.target)) {
         setActivePanel('')
+        setIsProfileMenuOpen(false)
       }
     }
 
@@ -169,12 +173,44 @@ export default function Landing({
           <div className="nav-actions">
             {currentUser ? (
               <>
-                <div className="landing-profile-chip" aria-label={`Signed in as ${currentUser.name}`}>
-                  <span className="avatar">{initial}</span>
-                  <div>
-                    <strong>{firstName}</strong>
-                    <small>{profileRoleLabel} - {currentUser.email}</small>
-                  </div>
+                <div className="landing-profile-anchor">
+                  <button
+                    type="button"
+                    className={isProfileMenuOpen ? 'landing-profile-chip active' : 'landing-profile-chip'}
+                    aria-label={`Open profile menu for ${currentUser.name}`}
+                    aria-expanded={isProfileMenuOpen}
+                    onClick={() => {
+                      setIsProfileMenuOpen((current) => !current)
+                      setActivePanel('')
+                    }}
+                  >
+                    <span className="avatar">{initial}</span>
+                    <span className="landing-profile-copy">
+                      <strong>{firstName}</strong>
+                      <small>{profileRoleLabel} - {currentUser.email}</small>
+                    </span>
+                    <Icon name="chevronDown" className="chevron-icon" size={18} />
+                  </button>
+
+                  {isProfileMenuOpen ? (
+                    <section className="landing-profile-menu" aria-label="Account menu">
+                      <div className="profile-popover-card landing-account-head">
+                        <span className="avatar large-avatar">{initial}</span>
+                        <div>
+                          <strong>{firstName}</strong>
+                          <p>{currentUser.email}</p>
+                        </div>
+                      </div>
+                      <button type="button" className="company-menu-row" onClick={onGetStarted}>
+                        <span>Go to workspace</span>
+                        <Icon name="arrowRight" size={16} />
+                      </button>
+                      <button type="button" className="company-menu-row logout-action" onClick={onLogout}>
+                        <span>Log out</span>
+                        <Icon name="logout" size={16} />
+                      </button>
+                    </section>
+                  ) : null}
                 </div>
                 <button type="button" className="solid-button small" onClick={() => setIsDialogOpen(true)}>
                   <span>Get Started</span>

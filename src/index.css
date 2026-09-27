@@ -323,6 +323,10 @@ img {
   gap: 8px;
 }
 
+.landing-profile-anchor {
+  position: relative;
+}
+
 .landing-profile-chip {
   min-height: 44px;
   display: inline-flex;
@@ -332,19 +336,38 @@ img {
   border-radius: 999px;
   padding: 4px 12px 4px 6px;
   background: rgba(255, 255, 255, 0.78);
+  color: inherit;
   box-shadow: 0 10px 24px rgba(18, 23, 34, 0.06);
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.landing-profile-chip div {
+.landing-profile-chip:hover,
+.landing-profile-chip.active {
+  border-color: rgba(49, 94, 234, 0.34);
+  box-shadow: 0 14px 34px rgba(49, 94, 234, 0.16);
+}
+
+.landing-profile-chip.active .chevron-icon {
+  transform: rotate(180deg);
+}
+
+.landing-profile-copy {
   display: grid;
+  min-width: 0;
   gap: 1px;
   line-height: 1.05;
+  text-align: left;
 }
 
 .landing-profile-chip strong {
+  max-width: 174px;
+  overflow: hidden;
   color: var(--charcoal);
   font-size: 0.9rem;
   font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .landing-profile-chip small {
@@ -1701,6 +1724,37 @@ img {
   font-size: 0.78rem;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.landing-profile-menu {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  z-index: 70;
+  width: min(310px, calc(100vw - 28px));
+  border: 1px solid rgba(32, 35, 43, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.96);
+  padding: 12px;
+  box-shadow: 0 28px 70px rgba(18, 23, 34, 0.18);
+  backdrop-filter: blur(18px);
+}
+
+.landing-profile-menu::before {
+  content: '';
+  position: absolute;
+  top: -7px;
+  right: 42px;
+  width: 14px;
+  height: 14px;
+  border-left: 1px solid rgba(32, 35, 43, 0.08);
+  border-top: 1px solid rgba(32, 35, 43, 0.08);
+  background: rgba(255, 255, 255, 0.96);
+  transform: rotate(45deg);
+}
+
+.landing-account-head {
+  padding: 10px 10px 14px;
 }
 
 .company-menu-row {

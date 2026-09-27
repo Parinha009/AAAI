@@ -331,6 +331,7 @@ export default function App() {
           onGoToLogin={() => openLogin()}
           onGoToSignup={() => openSignup()}
           onGetStarted={handleGetStarted}
+          onLogout={handleLogout}
         />
       )}
 

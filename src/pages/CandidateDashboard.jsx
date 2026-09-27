@@ -873,7 +873,7 @@ function PrivateIntroductionRecorder({ candidateName, candidateKey, onStartQuest
   )
 }
 
-export default function CandidateDashboard({ user, onOpenLogin, onOpenSignup, onBackToLanding }) {
+export default function CandidateDashboard({ user, onOpenLogin, onOpenSignup, onBackToLanding, onLogout }) {
   const [activeView, setActiveView] = useState('intro')
   const [isPracticeOpen, setIsPracticeOpen] = useState(false)
   const [isInterviewOpen, setIsInterviewOpen] = useState(false)
@@ -1086,18 +1086,29 @@ export default function CandidateDashboard({ user, onOpenLogin, onOpenSignup, on
                   </span>
                   Home
                 </button>
-                <button type="button" onClick={onOpenLogin}>
-                  <span className="menu-icon" aria-hidden="true">
-                    <Icon name="login" />
-                  </span>
-                  Log in
-                </button>
-                <button type="button" onClick={onOpenSignup}>
-                  <span className="menu-icon" aria-hidden="true">
-                    <Icon name="spark" />
-                  </span>
-                  Sign up
-                </button>
+                {user ? (
+                  <button type="button" className="logout-action" onClick={onLogout}>
+                    <span className="menu-icon" aria-hidden="true">
+                      <Icon name="logout" />
+                    </span>
+                    Log out
+                  </button>
+                ) : (
+                  <>
+                    <button type="button" onClick={onOpenLogin}>
+                      <span className="menu-icon" aria-hidden="true">
+                        <Icon name="login" />
+                      </span>
+                      Log in
+                    </button>
+                    <button type="button" onClick={onOpenSignup}>
+                      <span className="menu-icon" aria-hidden="true">
+                        <Icon name="spark" />
+                      </span>
+                      Sign up
+                    </button>
+                  </>
+                )}
               </section>
             ) : null}
           </div>

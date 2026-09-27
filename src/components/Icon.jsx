@@ -135,6 +135,13 @@ const icons = {
       <path d="M15 12H3" />
     </>
   ),
+  logout: (
+    <>
+      <path d="M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4" />
+      <path d="M14 7l5 5-5 5" />
+      <path d="M19 12H8" />
+    </>
+  ),
   mic: (
     <>
       <rect x="9" y="3" width="6" height="11" rx="3" />

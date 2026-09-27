@@ -231,6 +231,19 @@ export default function App() {
     setToast(null)
   }
 
+  const handleLogout = () => {
+    const name = currentUser?.name?.split(' ')[0] || 'Account'
+
+    setCurrentUser(null)
+    setCurrentRole('candidate')
+    setAuthRole('candidate')
+    setMagicLinkRequest(null)
+    setAuthNotice('')
+    resetForm()
+    setMode('landing')
+    showToast('success', 'Logged out', `${name} has been signed out.`)
+  }
+
   const handleChooseCompany = () => {
     if (currentUser) {
       setCurrentRole('company')
@@ -298,12 +311,14 @@ export default function App() {
         <CompanyDashboard
           user={currentUser}
           onBackToLanding={handleGoLanding}
+          onLogout={handleLogout}
           onOpenLogin={() => openLogin({ role: 'company' })}
         />
       ) : mode === 'candidate' ? (
         <CandidateDashboard
           user={currentUser}
           onBackToLanding={handleGoLanding}
+          onLogout={handleLogout}
           onOpenLogin={() => openLogin({ role: 'candidate' })}
           onOpenSignup={() => openSignup({ role: 'candidate' })}
         />

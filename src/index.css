@@ -1742,6 +1742,17 @@ img {
   color: var(--accent-dark);
 }
 
+.company-menu-row.logout-action {
+  margin-top: 6px;
+  border-top: 1px solid rgba(18, 23, 34, 0.08);
+  color: #b42318;
+}
+
+.company-menu-row.logout-action:hover {
+  background: #fff1f0;
+  color: #981b12;
+}
+
 .company-count-badge {
   min-width: 22px;
   height: 22px;
@@ -3236,6 +3247,21 @@ img {
 .profile-menu > button:hover {
   background: #f2f5ff;
   color: var(--accent-dark);
+}
+
+.profile-menu > button.logout-action {
+  margin-top: 8px;
+  border-top: 1px solid rgba(32, 35, 43, 0.08);
+  color: #b42318;
+}
+
+.profile-menu > button.logout-action:hover {
+  background: #fff1f0;
+  color: #981b12;
+}
+
+.profile-menu > button.logout-action .menu-icon {
+  background: #fff1f0;
 }
 
 .profile-menu > button .menu-icon {

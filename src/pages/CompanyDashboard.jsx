@@ -758,7 +758,7 @@ function CandidateDetailDrawer({ candidate, onClose }) {
   )
 }
 
-export default function CompanyDashboard({ user, onBackToLanding, onOpenLogin }) {
+export default function CompanyDashboard({ user, onBackToLanding, onOpenLogin, onLogout }) {
   const [activeMenu, setActiveMenu] = useState('')
   const [activeInterviewPage, setActiveInterviewPage] = useState('dashboard')
   const [projectStatus, setProjectStatus] = useState('active')
@@ -1028,6 +1028,17 @@ export default function CompanyDashboard({ user, onBackToLanding, onOpenLogin })
             <span>Back to landing</span>
             <Icon name="arrowRight" size={16} />
           </button>
+          {user ? (
+            <button type="button" className="company-menu-row logout-action" onClick={onLogout}>
+              <span>Log out</span>
+              <Icon name="logout" size={16} />
+            </button>
+          ) : (
+            <button type="button" className="company-menu-row" onClick={onOpenLogin}>
+              <span>Log in</span>
+              <Icon name="login" size={16} />
+            </button>
+          )}
         </section>
       ) : null}
 

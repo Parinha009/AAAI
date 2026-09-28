@@ -66,10 +66,11 @@ docker compose up -d db
 pytest
 ```
 
-16 tests cover: auth (magic-link, verify, single-use, anti-enumeration), the consent
+19 tests cover: auth (magic-link, verify, single-use, anti-enumeration), the consent
 gate (403 → 201 → 200), audio upload validation (201 / 413 / 415), tab-out logging +
-audit-log immutability, RBAC on `budget-status`, the budget kill-switch guard, and the
-recruiter dashboard (jobs, ranked leaderboard, candidate detail, audio playback).
+audit-log immutability, RBAC on `budget-status`, the budget kill-switch guard, the
+recruiter dashboard (jobs, ranked leaderboard, candidate detail, audio playback), and
+email delivery (dev-log fallback + the SMTP send path).
 
 ## API routes — aligned to **API Contract v1**
 
@@ -107,10 +108,14 @@ under `media/<candidate_id>/`). Upload returns `status: "transcribing"`; the fro
 polls `GET /responses/{id}` until final. Transcription itself (FR-07) is still a stub.
 
 **Magic-link flow (FR-04):** `POST /auth/magic-link` `{email}` → in dev the 202 response
-includes `dev_magic_link` / `dev_token` (real email is logged, not sent) → `POST /auth/verify`
+includes `dev_magic_link` / `dev_token` (link is logged, not emailed) → `POST /auth/verify`
 `{token}` → use `session_token` as `Authorization: Bearer`. Tokens are **single-use**,
 expire after 15 min, and sessions are **role-scoped** (candidate token → 403 on recruiter
 work and vice versa).
+
+**Real email (FR-04):** set `EMAIL_ENABLED=true` + the `SMTP_*` vars in `.env` (see
+`.env.example`) and the magic link is sent over SMTP via [app/email.py](app/email.py)
+instead of logged. Works with any SMTP provider (e.g. Gmail with an App Password).
 
 ## Access control (RBAC)
 
@@ -160,6 +165,5 @@ Recruiters see the state via `GET /system/budget-status` (`ok` / `paused`).
 
 ### Not yet built (later slices)
 The **AI pipeline** — real Whisper transcription (FR-07), the GPT follow-up
-(`/interview/follow-up`, FR-08), and JSON scoring (FR-03/10) — plus **real email
-delivery** for magic links. The budget hooks, upload storage, and recruiter dashboard
-are all ready for scores the moment the AI pipeline produces them.
+(`/interview/follow-up`, FR-08), and JSON scoring (FR-03/10). The budget hooks, upload
+storage, and recruiter dashboard are all ready for scores the moment it produces them.

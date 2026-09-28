@@ -30,6 +30,15 @@ class Settings(BaseSettings):
     frontend_base_url: str = "http://localhost:5173"  # link target the email points to
     email_enabled: bool = False  # False (dev): links are logged, not emailed
 
+    # SMTP (used only when email_enabled=True). Fill these from the provider.
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = "AAAI <no-reply@aaai.local>"
+    smtp_use_tls: bool = True  # STARTTLS (port 587); set False for a plain local server
+    smtp_use_ssl: bool = False  # implicit SSL (port 465)
+
     # CORS — origins allowed to call the API (the Vite dev server).
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 

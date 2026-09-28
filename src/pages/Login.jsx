@@ -1,83 +1,123 @@
 import AuthShell from '../components/AuthShell'
 
+const roleLabels = {
+  candidate: 'Candidate workspace',
+  company: 'Company workspace',
+}
+
+function LoadingLabel({ isLoading, label, loadingLabel }) {
+  return (
+    <>
+      {isLoading ? <span className="button-spinner" aria-hidden="true" /> : null}
+      <span>{isLoading ? loadingLabel : label}</span>
+    </>
+  )
+}
+
 export default function Login({
+  authRole,
   formData,
-  message,
+  isLoading,
+  loadingAction,
+  magicLinkRequest,
+  notice,
   onChange,
-  onForgetPassword,
+  onChangeEmail,
   onGoToLanding,
-  onSubmit,
+  onOpenMagicLink,
+  onResendMagicLink,
   onSwitchToSignup,
-  onTogglePassword,
-  showPassword,
+  onSubmit,
 }) {
+  const isLinkSent = Boolean(magicLinkRequest)
+  const selectedRole = magicLinkRequest?.role || authRole
+
   return (
     <AuthShell
       activeMode="login"
-      heroSubtitle="Set your preference, We match you with jobs."
-      heroTitle="Track everything in your dashboard"
-      logoAlt="AAAI Main logo"
-      logoSrc="/logo.svg"
       onLogoClick={onGoToLanding}
       onSwitchToLogin={() => {}}
       onSwitchToSignup={onSwitchToSignup}
     >
       <header className="auth-header">
-        <h1>Login To</h1>
-        <h2>Your Candidate Account</h2>
+        <p className="eyebrow">{isLinkSent ? 'Check your inbox' : 'Passwordless sign in'}</p>
+        <h1>{isLinkSent ? 'Your magic link is on its way.' : 'Sign in with one emailed link.'}</h1>
+        <p>
+          {isLinkSent
+            ? 'Open the link from your email to verify this browser and continue into AAAI.'
+            : 'Enter your email and AAAI will send a secure link. No password is created or stored.'}
+        </p>
       </header>
 
-      <form className="auth-form" onSubmit={onSubmit}>
-        <label>
-          <span>Email</span>
-          <input
-            name="email"
-            type="email"
-            placeholder="Email"
-            value={formData.email}
-            onChange={onChange}
-            autoComplete="email"
-          />
-        </label>
+      {notice ? <p className="auth-notice">{notice}</p> : null}
 
-        <label>
-          <span>Password</span>
-          <div className="password-row">
-            <input
-              name="password"
-              type={showPassword ? 'text' : 'password'}
-              placeholder="Password"
-              value={formData.password}
-              onChange={onChange}
-              autoComplete="current-password"
-            />
+      {isLinkSent ? (
+        <div className="auth-form">
+          <section className="magic-link-card" aria-label="Magic link sent">
+            <div className="magic-link-icon" aria-hidden="true">@</div>
+            <div>
+              <strong>Sent to {magicLinkRequest.email}</strong>
+              <p>
+                {roleLabels[selectedRole]} access is attached to this link.{' '}
+                Magic links expire after a short window and can only be used once. This demo includes a local
+                verification button in place of an email inbox.
+              </p>
+            </div>
+          </section>
+
+          <button
+            type="button"
+            className="submit-button"
+            onClick={onOpenMagicLink}
+          >
+            Open demo magic link
+          </button>
+
+          <div className="auth-link-actions">
             <button
               type="button"
-              className="icon-button"
-              onClick={onTogglePassword}
-              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              className="text-link"
+              onClick={onResendMagicLink}
+              disabled={isLoading}
+              aria-busy={loadingAction === 'resendMagicLink'}
             >
-              {showPassword ? 'Hide' : 'Show'}
+              {loadingAction === 'resendMagicLink' ? 'Resending link...' : 'Resend link'}
+            </button>
+            <button type="button" className="text-link" onClick={onChangeEmail}>
+              Use another email
             </button>
           </div>
-          <button type="button" className="text-link" onClick={onForgetPassword}>
-            Forget Password
+        </div>
+      ) : (
+        <form className="auth-form" onSubmit={onSubmit}>
+          <label className="field-group" htmlFor="login-email">
+            <span>Email</span>
+            <input
+              id="login-email"
+              name="email"
+              type="email"
+              placeholder="you@company.com"
+              value={formData.email}
+              onChange={onChange}
+              autoComplete="email"
+              autoFocus
+            />
+          </label>
+
+          <button
+            type="submit"
+            className="submit-button"
+            disabled={loadingAction === 'magicLink'}
+            aria-busy={loadingAction === 'magicLink'}
+          >
+            <LoadingLabel
+              isLoading={loadingAction === 'magicLink'}
+              label="Send magic link"
+              loadingLabel="Sending link"
+            />
           </button>
-        </label>
-
-        <label className="auth-form-spacer" aria-hidden="true">
-          <span>Confirm Password</span>
-          <div className="password-row">
-            <input tabIndex={-1} type="password" placeholder="Confirm Password" readOnly />
-          </div>
-        </label>
-
-        <button type="submit" className="submit-button">
-          Login
-        </button>
-
-        {message ? <p className="status-message">{message}</p> : null}
-      </form>
+        </form>
+      )}
     </AuthShell>
   )
 }

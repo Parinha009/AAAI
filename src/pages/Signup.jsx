@@ -1,92 +1,129 @@
 import AuthShell from '../components/AuthShell'
 
+const roleLabels = {
+  candidate: 'Candidate workspace',
+  company: 'Company workspace',
+}
+
 export default function Signup({
+  authRole,
   formData,
-  message,
+  isLoading,
+  loadingAction,
+  magicLinkRequest,
+  notice,
   onChange,
+  onChangeEmail,
   onGoToLanding,
+  onOpenMagicLink,
+  onResendMagicLink,
   onSubmit,
   onSwitchToLogin,
-  onTogglePassword,
-  showPassword,
 }) {
+  const isLinkSent = Boolean(magicLinkRequest)
+  const selectedRole = magicLinkRequest?.role || authRole
+
   return (
     <AuthShell
       activeMode="signup"
-      heroSubtitle="Set your preference, We match you with jobs."
-      heroTitle="Track everything in your dashboard"
-      logoAlt="AAAI Main logo"
-      logoSrc="/logo.svg"
       onLogoClick={onGoToLanding}
       onSwitchToLogin={onSwitchToLogin}
       onSwitchToSignup={() => {}}
     >
       <header className="auth-header">
-        <h1>Sign Up To</h1>
-        <h2>Your Candidate Account</h2>
+        <p className="eyebrow">{isLinkSent ? 'Verify your email' : 'Create account'}</p>
+        <h1>{isLinkSent ? 'Finish with your magic link.' : 'Build your AAAI profile.'}</h1>
+        <p>
+          {isLinkSent
+            ? 'Use the emailed link to verify this account and start without a password.'
+            : 'Create one clean profile for interviews, CV screening, and follow-up decisions. No password required.'}
+        </p>
       </header>
 
-      <form className="auth-form" onSubmit={onSubmit}>
-        <label>
-          <span>Email</span>
-          <input
-            name="email"
-            type="email"
-            placeholder="Email"
-            value={formData.email}
-            onChange={onChange}
-            autoComplete="email"
-          />
-        </label>
+      {notice ? <p className="auth-notice">{notice}</p> : null}
 
-        <label>
-          <span>Password</span>
-          <div className="password-row">
-            <input
-              name="password"
-              type={showPassword ? 'text' : 'password'}
-              placeholder="Password"
-              value={formData.password}
-              onChange={onChange}
-              autoComplete="new-password"
-            />
+      {isLinkSent ? (
+        <div className="auth-form">
+          <section className="magic-link-card" aria-label="Magic link sent">
+            <div className="magic-link-icon" aria-hidden="true">@</div>
+            <div>
+              <strong>Sent to {magicLinkRequest.email}</strong>
+              <p>
+                {roleLabels[selectedRole]} access is ready to verify. This demo includes a local verification
+                button in place of an email inbox.
+              </p>
+            </div>
+          </section>
+
+          <button
+            type="button"
+            className="submit-button"
+            onClick={onOpenMagicLink}
+          >
+            Open demo magic link
+          </button>
+
+          <div className="auth-link-actions">
             <button
               type="button"
-              className="icon-button"
-              onClick={onTogglePassword}
-              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              className="text-link"
+              onClick={onResendMagicLink}
+              disabled={loadingAction === 'resendMagicLink'}
+              aria-busy={loadingAction === 'resendMagicLink'}
             >
-              {showPassword ? 'Hide' : 'Show'}
+              {loadingAction === 'resendMagicLink' ? 'Resending link...' : 'Resend link'}
+            </button>
+            <button type="button" className="text-link" onClick={onChangeEmail}>
+              Edit email
             </button>
           </div>
-        </label>
-
-        <label>
-          <span>Confirm Password</span>
-          <div className="password-row">
-            <input
-              name="confirmPassword"
-              type={showPassword ? 'text' : 'password'}
-              placeholder="Confirm Password"
-              value={formData.confirmPassword}
-              onChange={onChange}
-              autoComplete="new-password"
-            />
-          </div>
-        </label>
-
-        <div className="forgot-password-spacer" aria-hidden="true">
-          <button type="button" className="text-link spacer-link" tabIndex={-1}>
-            Forget Password
-          </button>
         </div>
+      ) : (
+        <form className="auth-form" onSubmit={onSubmit}>
+          <label className="field-group" htmlFor="signup-name">
+            <span>Full name</span>
+            <input
+              id="signup-name"
+              name="fullName"
+              type="text"
+              placeholder="Avery Chen"
+              value={formData.fullName}
+              onChange={onChange}
+              autoComplete="name"
+              autoFocus
+            />
+          </label>
 
-        <button type="submit" className="submit-button">
-          Sign Up
-        </button>
+          <label className="field-group" htmlFor="signup-email">
+            <span>Email</span>
+            <input
+              id="signup-email"
+              name="email"
+              type="email"
+              placeholder="you@company.com"
+              value={formData.email}
+              onChange={onChange}
+              autoComplete="email"
+            />
+          </label>
 
-        {message ? <p className="status-message">{message}</p> : null}
-      </form>
+          <label className="terms-row" htmlFor="acceptTerms">
+            <input
+              id="acceptTerms"
+              name="acceptTerms"
+              type="checkbox"
+              checked={formData.acceptTerms}
+              onChange={onChange}
+            />
+            <span>I agree to thoughtful, bias-aware screening and product updates.</span>
+          </label>
+
+          <button type="submit" className="submit-button" disabled={isLoading} aria-busy={isLoading}>
+            {isLoading ? <span className="button-spinner" aria-hidden="true" /> : null}
+            <span>{isLoading ? 'Sending magic link' : 'Send magic link'}</span>
+          </button>
+        </form>
+      )}
     </AuthShell>
   )
 }

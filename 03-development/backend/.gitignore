@@ -1,0 +1,20 @@
+# Secrets — never commit (SRS-NFR-04)
+.env
+*.env
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Local media / audio artifacts
+media/
+uploads/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

@@ -1,215 +1,247 @@
 import { useEffect, useRef, useState } from 'react'
+import Icon from '../components/Icon'
 
-const sections = [
-  { label: 'How it works?', target: 'how-it-works' },
-  { label: 'Pricing', target: 'pricing' },
+const navItems = [
+  { id: 'workflow', label: 'How it works?' },
+  { id: 'pricing', label: 'Pricing' },
+  { id: 'resources', label: 'Resources' },
+  { id: 'use-cases', label: 'Use Cases' },
+  { id: 'contact-us', label: 'Contact Us' },
 ]
 
-const navSections = {
-  'how-it-works': {
-    label: 'How it works',
+const navPanels = {
+  workflow: {
+    eyebrow: 'How it works',
     title: 'How it works',
-    description: 'Choose your role, sign in, and continue to the matching experience.',
-    items: ['Pick a role', 'Sign in or sign up', 'Continue to your dashboard'],
+    copy: 'Choose your path, confirm your account, and continue into the right workspace.',
+    items: ['Pick a role', 'Verify your email', 'Continue to your dashboard'],
   },
   pricing: {
-    label: 'Pricing',
+    eyebrow: 'Pricing',
     title: 'Pricing',
-    description: 'Start free and scale when you are ready.',
+    copy: 'Start free and scale when your hiring workflow needs more capacity.',
     items: ['Free to start', 'Scale when needed', 'No hidden setup fees'],
   },
   resources: {
-    label: 'Resources',
+    eyebrow: 'Resources',
     title: 'Resources',
-    description: 'Guides, setup help, and support material live here.',
-    items: [
-      'Compare Flowmingo',
-      'Blog',
-      'FAQ - Help Centre',
-      'Careers',
-    ],
+    copy: 'Guides, setup help, and support material live here.',
+    items: ['Compare Flowmingo', 'Blog', 'FAQ - Help Centre', 'Careers'],
   },
   'use-cases': {
-    label: 'Use Cases',
+    eyebrow: 'Use cases',
     title: 'Use Cases',
-    description: 'Recruiters, hiring teams, and candidates can all use the same flow.',
-    items: [
-      'For Candidates',
-      'View Sample Result',
-      'Take Demo Interview',
-    ],
+    copy: 'Recruiters, hiring teams, and candidates can all use the same polished screening flow.',
+    items: ['For Candidates', 'View Sample Result', 'Take Demo Interview'],
   },
   'contact-us': {
-    label: 'Contact Us',
+    eyebrow: 'Contact us',
     title: 'Contact Us',
-    description: 'Need help? Reach out and we can extend the flow for your team.',
+    copy: 'Need help? Reach out and we can extend the flow for your team.',
     items: ['Email support', 'Book a demo', 'Request onboarding help'],
   },
 }
 
-const options = [
+const workflowSteps = [
+  {
+    count: '01',
+    title: 'Invite',
+    copy: 'Send a polished interview link with structured expectations and a calm candidate entry point.',
+  },
+  {
+    count: '02',
+    title: 'Screen',
+    copy: 'Collect CV context, async answers, tab events, and completion status without clutter.',
+  },
+  {
+    count: '03',
+    title: 'Shortlist',
+    copy: 'Review ranked signals, follow-up prompts, and recruiter-ready summaries in one place.',
+  },
+]
+
+const useCases = [
+  'Graduate hiring',
+  'High-volume screening',
+  'Remote candidate reviews',
+  'Structured interview prep',
+]
+
+const roleOptions = [
   {
     id: 'company',
     title: 'Company / Recruiter',
-    buttonLabel: 'Company Sign In',
-    icon: '🏢',
+    description: 'Manage projects, candidates, scorecards, and interview signals.',
+    action: 'Continue as company',
+    icon: 'company',
   },
   {
     id: 'candidate',
     title: 'Candidate / Job Seeker',
-    buttonLabel: 'Candidate Sign In',
-    icon: '👤',
+    description: 'Open your profile, practice space, and interview workflow.',
+    action: 'Continue as candidate',
+    icon: 'candidate',
   },
 ]
 
-export default function Landing({ onGoToLogin, onGoToSignup, onChooseCompany, onChooseCandidate }) {
-  const [isModalOpen, setIsModalOpen] = useState(true)
-  const [selectedRole, setSelectedRole] = useState('')
-  const [statusMessage, setStatusMessage] = useState('')
-  const [activeSection, setActiveSection] = useState('')
-  const [lockedSection, setLockedSection] = useState('')
-  const landingHeaderRef = useRef(null)
-
-  const handleSelect = (role) => {
-    setSelectedRole(role)
-    setStatusMessage(role === 'company' ? 'Company / Recruiter selected.' : 'Candidate / Job Seeker selected.')
-  }
-
-  const handleContinue = () => {
-    if (selectedRole === 'company') {
-      onChooseCompany()
-      return
-    }
-
-    if (selectedRole === 'candidate') {
-      onChooseCandidate()
-      return
-    }
-
-    setIsModalOpen(false)
-    setStatusMessage('Modal closed.')
-  }
-
-  const handleShowSection = (sectionKey) => {
-    if (!lockedSection) {
-      setActiveSection(sectionKey)
-    }
-  }
-
-  const handleLockSection = (sectionKey) => {
-    setActiveSection(sectionKey)
-    setLockedSection(sectionKey)
-  }
+export default function Landing({
+  currentUser,
+  currentRole = 'candidate',
+  onGoToLogin,
+  onGoToSignup,
+  onChooseCompany,
+  onChooseCandidate,
+  onGetStarted,
+  onLogout,
+}) {
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [activePanel, setActivePanel] = useState('')
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
+  const headerRef = useRef(null)
+  const firstName = currentUser?.name?.split(' ')[0] || 'Account'
+  const initial = firstName.charAt(0).toUpperCase()
+  const profileRoleLabel = currentRole === 'company' ? 'Company' : 'Candidate'
 
   useEffect(() => {
-    const handlePointerDown = (event) => {
-      if (!landingHeaderRef.current) {
-        return
-      }
-
-      if (!landingHeaderRef.current.contains(event.target)) {
-        setActiveSection('')
-        setLockedSection('')
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setIsDialogOpen(false)
+        setActivePanel('')
+        setIsProfileMenuOpen(false)
       }
     }
 
-    document.addEventListener('pointerdown', handlePointerDown)
+    const handlePointerDown = (event) => {
+      if (headerRef.current && !headerRef.current.contains(event.target)) {
+        setActivePanel('')
+        setIsProfileMenuOpen(false)
+      }
+    }
 
+    document.addEventListener('keydown', handleKeyDown)
+    document.addEventListener('pointerdown', handlePointerDown)
     return () => {
+      document.removeEventListener('keydown', handleKeyDown)
       document.removeEventListener('pointerdown', handlePointerDown)
     }
   }, [])
 
+  const handleContinue = (role) => {
+    setIsDialogOpen(false)
+
+    if (role === 'company') {
+      onChooseCompany()
+      return
+    }
+
+    onChooseCandidate()
+  }
+
+  const panel = activePanel ? navPanels[activePanel] : null
+
   return (
     <main className="landing-page">
-      <div
-        className="landing-header-area"
-        ref={landingHeaderRef}
-        onMouseLeave={() => {
-          if (!lockedSection) {
-            setActiveSection('')
-          }
-        }}
-      >
+      <div className="landing-header-shell" ref={headerRef}>
         <header className="landing-nav">
           <button
             type="button"
-            className="landing-brand-button"
+            className="brand-button"
             onClick={() => {
-              setActiveSection('')
-              setLockedSection('')
+              setActivePanel('')
               window.scrollTo({ top: 0, behavior: 'smooth' })
             }}
           >
-            <span className="landing-brand">
-              <img src="/logo.svg" alt="AAAI Main logo" className="landing-logo" />
-              <span>TalentPulse</span>
-            </span>
+            <img src="/logo.svg" alt="AAAI logo" className="brand-logo-small" />
+            <span>AAAI</span>
           </button>
-          <nav className="landing-actions" aria-label="Primary navigation">
-            <div className="landing-center-links">
-              {sections.map((section) => (
-                <button
-                  key={section.target}
-                  type="button"
-                  className={activeSection === section.target ? 'nav-text-button nav-dropdown-button active' : 'nav-text-button nav-dropdown-button'}
-                  aria-pressed={activeSection === section.target}
-                  onMouseEnter={() => handleShowSection(section.target)}
-                  onClick={() => handleLockSection(section.target)}
-                >
-                  {section.label}
-                </button>
-              ))}
+
+          <nav className="nav-links" aria-label="Primary navigation">
+            {navItems.map((item) => (
               <button
                 type="button"
-                className={activeSection === 'resources' ? 'nav-text-button nav-dropdown-button active' : 'nav-text-button nav-dropdown-button'}
-                aria-pressed={activeSection === 'resources'}
-                onMouseEnter={() => handleShowSection('resources')}
-                onClick={() => handleLockSection('resources')}
+                key={item.id}
+                className={activePanel === item.id ? 'nav-button active' : 'nav-button'}
+                aria-pressed={activePanel === item.id}
+                onMouseEnter={() => setActivePanel(item.id)}
+                onClick={() => setActivePanel((current) => (current === item.id ? '' : item.id))}
               >
-                Resources
+                {item.label}
               </button>
-              <button
-                type="button"
-                className={activeSection === 'use-cases' ? 'nav-text-button nav-dropdown-button active' : 'nav-text-button nav-dropdown-button'}
-                aria-pressed={activeSection === 'use-cases'}
-                onMouseEnter={() => handleShowSection('use-cases')}
-                onClick={() => handleLockSection('use-cases')}
-              >
-                Use Cases
-              </button>
-              <button
-                type="button"
-                className={activeSection === 'contact-us' ? 'nav-text-button nav-dropdown-button active' : 'nav-text-button nav-dropdown-button'}
-                aria-pressed={activeSection === 'contact-us'}
-                onMouseEnter={() => handleShowSection('contact-us')}
-                onClick={() => handleLockSection('contact-us')}
-              >
-                Contact Us
-              </button>
-            </div>
-            <div className="landing-auth-actions">
-              <button type="button" className="nav-text-button" onClick={onGoToLogin}>
-                Login
-              </button>
-              <button type="button" className="nav-text-button" onClick={onGoToSignup}>
-                Sign Up
-              </button>
-              <button type="button" className="nav-start-button" onClick={() => setIsModalOpen(true)}>
-                Get Started →
-              </button>
-            </div>
+            ))}
           </nav>
+
+          <div className="nav-actions">
+            {currentUser ? (
+              <>
+                <div className="landing-profile-anchor">
+                  <button
+                    type="button"
+                    className={isProfileMenuOpen ? 'landing-profile-chip active' : 'landing-profile-chip'}
+                    aria-label={`Open profile menu for ${currentUser.name}`}
+                    aria-expanded={isProfileMenuOpen}
+                    onClick={() => {
+                      setIsProfileMenuOpen((current) => !current)
+                      setActivePanel('')
+                    }}
+                  >
+                    <span className="avatar">{initial}</span>
+                    <span className="landing-profile-copy">
+                      <strong>{firstName}</strong>
+                      <small>{profileRoleLabel} - {currentUser.email}</small>
+                    </span>
+                    <Icon name="chevronDown" className="chevron-icon" size={18} />
+                  </button>
+
+                  {isProfileMenuOpen ? (
+                    <section className="landing-profile-menu" aria-label="Account menu">
+                      <div className="profile-popover-card landing-account-head">
+                        <span className="avatar large-avatar">{initial}</span>
+                        <div>
+                          <strong>{firstName}</strong>
+                          <p>{currentUser.email}</p>
+                        </div>
+                      </div>
+                      <button type="button" className="company-menu-row" onClick={onGetStarted}>
+                        <span>Go to workspace</span>
+                        <Icon name="arrowRight" size={16} />
+                      </button>
+                      <button type="button" className="company-menu-row logout-action" onClick={onLogout}>
+                        <span>Log out</span>
+                        <Icon name="logout" size={16} />
+                      </button>
+                    </section>
+                  ) : null}
+                </div>
+                <button type="button" className="solid-button small" onClick={() => setIsDialogOpen(true)}>
+                  <span>Get Started</span>
+                  <Icon name="arrowRight" />
+                </button>
+              </>
+            ) : (
+              <>
+                <button type="button" className="ghost-button" onClick={onGoToLogin}>
+                  Login
+                </button>
+                <button type="button" className="ghost-button" onClick={onGoToSignup}>
+                  Sign Up
+                </button>
+                <button type="button" className="solid-button small" onClick={() => setIsDialogOpen(true)}>
+                  <span>Get Started</span>
+                  <Icon name="arrowRight" />
+                </button>
+              </>
+            )}
+          </div>
         </header>
 
-        {activeSection ? (
-          <section className="landing-section landing-dynamic-section" aria-live="polite">
-            <p className="landing-section-kicker">{navSections[activeSection].label}</p>
-            <h3>{navSections[activeSection].title}</h3>
-            <p>{navSections[activeSection].description}</p>
-            <div className="landing-section-grid">
-              {navSections[activeSection].items.map((item) => (
-                <article key={item} className="landing-section-card">
+        {panel ? (
+          <section className="landing-mega-panel" aria-live="polite">
+            <p className="eyebrow">{panel.eyebrow}</p>
+            <h2>{panel.title}</h2>
+            <p>{panel.copy}</p>
+            <div className="mega-card-grid">
+              {panel.items.map((item) => (
+                <article className="mega-card" key={item}>
                   {item}
                 </article>
               ))}
@@ -218,57 +250,190 @@ export default function Landing({ onGoToLogin, onGoToSignup, onChooseCompany, on
         ) : null}
       </div>
 
-      <section className="landing-hero">
-        <p className="landing-pill">Now powered by AI</p>
-        <h1>AI Interview &amp; CV Screener</h1>
-        <p className="landing-copy">
-          Fast, clean screening that helps recruiters discover hidden talent sooner and keeps job seekers moving.
-        </p>
-        <h2>FREE. FOREVER.</h2>
-        <button type="button" className="primary-cta" onClick={() => setIsModalOpen(true)}>
-          Get Started Free →
-        </button>
+      <section className="landing-hero" aria-labelledby="hero-title">
+        <div className="landing-live-background" aria-hidden="true">
+          <span className="live-orb live-orb-one" />
+          <span className="live-orb live-orb-two" />
+          <span className="live-beam live-beam-one" />
+          <span className="live-beam live-beam-two" />
+          <span className="live-node live-node-one" />
+          <span className="live-node live-node-two" />
+          <span className="live-node live-node-three" />
+        </div>
+        <div className="hero-copy">
+          <p className="eyebrow">AI interview and CV screener</p>
+          <h1 id="hero-title">AI Interview &amp; CV Screener</h1>
+          <p>
+            AAAI turns async interviews into clear hiring signal with structured prompts, fairer review,
+            and a candidate experience that feels considered from the first click.
+          </p>
+
+          <div className="hero-actions">
+            <button type="button" className="solid-button" onClick={() => setIsDialogOpen(true)}>
+              {currentUser ? 'Go to workspace' : 'Start free'}
+            </button>
+            {currentUser ? null : (
+              <button type="button" className="soft-button" onClick={onGoToSignup}>
+                Create account
+              </button>
+            )}
+          </div>
+
+          <dl className="hero-metrics" aria-label="Product highlights">
+            <div>
+              <dt>Free</dt>
+              <dd>to launch</dd>
+            </div>
+            <div>
+              <dt>24/7</dt>
+              <dd>async review</dd>
+            </div>
+            <div>
+              <dt>Zero</dt>
+              <dd>setup fees</dd>
+            </div>
+          </dl>
+        </div>
+
+        <div className="product-preview" aria-label="AAAI screening dashboard preview">
+          <div className="preview-topbar">
+            <span className="preview-dot active" />
+            <span className="preview-dot" />
+            <span className="preview-dot" />
+            <span className="preview-status">Live shortlist</span>
+          </div>
+          <div className="preview-grid">
+            <section className="preview-panel preview-main">
+              <div className="preview-panel-header">
+                <span>Candidate signal</span>
+                <strong>92</strong>
+              </div>
+              <div className="signal-bars" aria-hidden="true">
+                <span style={{ height: '72%' }} />
+                <span style={{ height: '48%' }} />
+                <span style={{ height: '84%' }} />
+                <span style={{ height: '58%' }} />
+                <span style={{ height: '91%' }} />
+              </div>
+            </section>
+            <section className="preview-panel">
+              <div className="preview-panel-header">
+                <span>Interview</span>
+                <strong>Ready</strong>
+              </div>
+              <p>Follow-up prompt generated after a calm, structured review.</p>
+            </section>
+            <section className="preview-panel">
+              <div className="preview-panel-header">
+                <span>CV match</span>
+                <strong>High</strong>
+              </div>
+              <p>Role fit, communication, and required skills summarized.</p>
+            </section>
+          </div>
+        </div>
       </section>
 
-      {isModalOpen ? <div className="landing-overlay" aria-hidden="true" /> : null}
+      <section className="section-band" id="workflow" aria-labelledby="workflow-title">
+        <div className="section-heading">
+          <p className="eyebrow">Workflow</p>
+          <h2 id="workflow-title">A quieter screening system with sharper outcomes.</h2>
+          <p>Each step removes operational noise so teams can spend more time on actual hiring judgment.</p>
+        </div>
 
-      {isModalOpen ? (
-        <section className="landing-modal" aria-label="Choose account type">
-          <button type="button" className="modal-close" onClick={handleContinue} aria-label="Close dialog">
-            ×
+        <div className="workflow-grid">
+          {workflowSteps.map((step) => (
+            <article className="workflow-card" key={step.count}>
+              <span>{step.count}</span>
+              <h3>{step.title}</h3>
+              <p>{step.copy}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="split-section" id="use-cases" aria-labelledby="use-cases-title">
+        <div>
+          <p className="eyebrow">Use cases</p>
+          <h2 id="use-cases-title">Designed for modern hiring rhythms.</h2>
+          <p>
+            Use AAAI when you need consistent screening, respectful async interviews, and decision-ready
+            summaries without an overloaded recruiting stack.
+          </p>
+        </div>
+
+        <div className="use-case-list">
+          {useCases.map((item) => (
+            <span key={item}>{item}</span>
+          ))}
+        </div>
+      </section>
+
+      <section className="pricing-section" id="pricing" aria-labelledby="pricing-title">
+        <div className="pricing-copy">
+          <p className="eyebrow">Pricing</p>
+          <h2 id="pricing-title">Start free. Scale only when the workflow earns it.</h2>
+          <p>No hidden setup fees, no bloated tiers, and no pressure to commit before your team has signal.</p>
+        </div>
+
+        <div className="pricing-card">
+          <span>Starter</span>
+          <strong>Free forever</strong>
+          <p>Launch async screening, invite candidates, and review core interview signals.</p>
+          <button type="button" className="solid-button" onClick={() => setIsDialogOpen(true)}>
+            Choose your path
           </button>
-          <h3>What best describes you?</h3>
-          <div className="option-grid">
-            {options.map((option) => (
-              <article className="option-card" key={option.id} aria-selected={selectedRole === option.id}>
-                <div className="option-icon" aria-hidden="true">
-                  {option.icon}
-                </div>
-                <h4>{option.title}</h4>
-                <button
-                  type="button"
-                  className="option-button"
-                  onClick={() => {
-                    handleSelect(option.id)
-                    if (option.id === 'company') {
-                      onChooseCompany()
-                    } else {
-                      onChooseCandidate()
-                    }
-                  }}
-                >
-                  {option.buttonLabel} →
-                </button>
-              </article>
-            ))}
-          </div>
-          <div className="modal-footer">
-            <p className="modal-message">{statusMessage || 'Choose one path to continue.'}</p>
-            <button type="button" className="secondary-cta" onClick={handleContinue}>
-              Continue
-            </button>
-          </div>
-        </section>
+        </div>
+      </section>
+
+      <footer className="site-footer">
+        <div>
+          <img src="/logo.svg" alt="" className="footer-logo" />
+          <span>AAAI</span>
+        </div>
+        <p>Premium async screening for teams that care about speed, structure, and candidate experience.</p>
+      </footer>
+
+      {isDialogOpen ? (
+        <div className="dialog-backdrop" role="presentation" onMouseDown={() => setIsDialogOpen(false)}>
+          <section
+            className="role-dialog role-dialog-wide"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="role-dialog-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="dialog-header dialog-header-center">
+              <p className="eyebrow">Choose workspace</p>
+              <h2 id="role-dialog-title">Where should AAAI take you?</h2>
+              <button type="button" className="icon-only-button" onClick={() => setIsDialogOpen(false)} aria-label="Close dialog">
+                <Icon name="close" />
+              </button>
+            </div>
+
+            <div className="role-choice-list">
+              {roleOptions.map((option) => (
+                <article className="role-choice-row" key={option.id}>
+                  <span className="role-choice-icon" aria-hidden="true">
+                    <Icon name={option.icon} size={22} />
+                  </span>
+                  <div className="role-choice-copy">
+                    <h3>{option.title}</h3>
+                    <p>{option.description}</p>
+                  </div>
+                  <button
+                    type="button"
+                    className="role-signin-button"
+                    onClick={() => handleContinue(option.id)}
+                  >
+                    <span>{option.action}</span>
+                    <Icon name="arrowRight" />
+                  </button>
+                </article>
+              ))}
+            </div>
+          </section>
+        </div>
       ) : null}
     </main>
   )

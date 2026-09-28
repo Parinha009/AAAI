@@ -142,6 +142,20 @@ const icons = {
       <path d="M19 12H8" />
     </>
   ),
+  mail: (
+    <>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="m3 7 9 6 9-6" />
+    </>
+  ),
+  listChecks: (
+    <>
+      <path d="m4 7 2 2 4-4" />
+      <path d="M12 7h8" />
+      <path d="m4 17 2 2 4-4" />
+      <path d="M12 17h8" />
+    </>
+  ),
   mic: (
     <>
       <rect x="9" y="3" width="6" height="11" rx="3" />
@@ -194,6 +208,22 @@ const icons = {
     <>
       <circle cx="11" cy="11" r="7" />
       <path d="m16 16 4 4" />
+    </>
+  ),
+  scanSearch: (
+    <>
+      <path d="M7 3H5a2 2 0 0 0-2 2v2" />
+      <path d="M17 3h2a2 2 0 0 1 2 2v2" />
+      <path d="M21 17v2a2 2 0 0 1-2 2h-2" />
+      <path d="M7 21H5a2 2 0 0 1-2-2v-2" />
+      <circle cx="11" cy="11" r="3" />
+      <path d="m16 16-2.2-2.2" />
+    </>
+  ),
+  send: (
+    <>
+      <path d="m22 2-7 20-4-9-9-4 20-7Z" />
+      <path d="M22 2 11 13" />
     </>
   ),
   shield: (

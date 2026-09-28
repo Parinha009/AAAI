@@ -40,12 +40,12 @@ export default function Login({
       onSwitchToSignup={onSwitchToSignup}
     >
       <header className="auth-header">
-        <p className="eyebrow">{isLinkSent ? 'Check your inbox' : 'Passwordless sign in'}</p>
-        <h1>{isLinkSent ? 'Your magic link is on its way.' : 'Sign in with one emailed link.'}</h1>
+        <p className="eyebrow">{isLinkSent ? 'Check your inbox' : 'Secure sign in'}</p>
+        <h1>{isLinkSent ? 'Your sign-in link is on its way.' : 'Welcome back.'}</h1>
         <p>
           {isLinkSent
             ? 'Open the link from your email to verify this browser and continue into AAAI.'
-            : 'Enter your email and AAAI will send a secure link. No password is created or stored.'}
+            : "Enter your email and we'll send you a secure sign-in link. No password is required."}
         </p>
       </header>
 
@@ -58,9 +58,8 @@ export default function Login({
             <div>
               <strong>Sent to {magicLinkRequest.email}</strong>
               <p>
-                {roleLabels[selectedRole]} access is attached to this link.{' '}
-                Magic links expire after a short window and can only be used once. This demo includes a local
-                verification button in place of an email inbox.
+                {roleLabels[selectedRole]} access is attached to this link. It expires soon and can only be used once.
+                This demo includes a local verification button in place of an email inbox.
               </p>
             </div>
           </section>
@@ -70,7 +69,7 @@ export default function Login({
             className="submit-button"
             onClick={onOpenMagicLink}
           >
-            Open demo magic link
+            Open demo sign-in link
           </button>
 
           <div className="auth-link-actions">
@@ -81,7 +80,7 @@ export default function Login({
               disabled={isLoading}
               aria-busy={loadingAction === 'resendMagicLink'}
             >
-              {loadingAction === 'resendMagicLink' ? 'Resending link...' : 'Resend link'}
+              {loadingAction === 'resendMagicLink' ? 'Resending link...' : 'Resend sign-in link'}
             </button>
             <button type="button" className="text-link" onClick={onChangeEmail}>
               Use another email
@@ -91,12 +90,12 @@ export default function Login({
       ) : (
         <form className="auth-form" onSubmit={onSubmit}>
           <label className="field-group" htmlFor="login-email">
-            <span>Email</span>
+            <span>Work email</span>
             <input
               id="login-email"
               name="email"
               type="email"
-              placeholder="you@company.com"
+              placeholder="name@company.com"
               value={formData.email}
               onChange={onChange}
               autoComplete="email"
@@ -112,7 +111,7 @@ export default function Login({
           >
             <LoadingLabel
               isLoading={loadingAction === 'magicLink'}
-              label="Send magic link"
+              label="Send sign-in link"
               loadingLabel="Sending link"
             />
           </button>

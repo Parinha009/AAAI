@@ -14,21 +14,22 @@ export default function AuthShell({
         </button>
 
         <div className="auth-side-copy">
-          <p className="eyebrow">Asynchronous hiring studio</p>
-          <h2>Clean signal for every interview, from first screen to final shortlist.</h2>
+          <p className="eyebrow">AI-powered hiring platform</p>
+          <h2>Screen candidates with structure and confidence.</h2>
           <p>
-            A calmer way to qualify talent: structured prompts, thoughtful scoring, and candidate-friendly pacing.
+            AAAI brings CV review, asynchronous interviews, and shortlist signals into one focused
+            recruiter workspace.
           </p>
         </div>
 
         <div className="auth-proof-grid" aria-label="Platform highlights">
           <div>
             <span className="proof-value">4.8x</span>
-            <span className="proof-label">faster shortlist</span>
+            <span className="proof-label">faster shortlist review</span>
           </div>
           <div>
             <span className="proof-value">24h</span>
-            <span className="proof-label">screening window</span>
+            <span className="proof-label">candidate-friendly access</span>
           </div>
         </div>
       </section>

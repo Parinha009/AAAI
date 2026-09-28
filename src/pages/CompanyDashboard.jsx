@@ -9,8 +9,8 @@ const menuPanels = {
   ],
   interview: [
     { id: 'dashboard', label: 'Dashboard' },
-    { id: 'sets', label: 'AI Interview Sets', count: 1 },
-    { id: 'candidates', label: 'AI Interview Candidates', count: 1 },
+    { id: 'sets', label: 'Interview sets', count: 1 },
+    { id: 'candidates', label: 'Candidates', count: 1 },
   ],
 }
 
@@ -23,8 +23,8 @@ const projects = [
     date: '28 Jul 2026',
     candidates: 4,
     assessments: [
-      'Demo - AI Interview (Frontend Engineer)',
-      'Demo - CV Eval (Frontend Engineer)',
+      'Frontend Engineer async interview',
+      'Frontend Engineer CV screening',
     ],
   },
   {
@@ -35,8 +35,8 @@ const projects = [
     date: '2 Aug 2026',
     candidates: 3,
     assessments: [
-      'Demo - AI Interview (Marketing and Operation)',
-      'Demo - CV Eval (Marketing and Operation)',
+      'Marketing and Operations async interview',
+      'Marketing and Operations CV screening',
     ],
   },
 ]
@@ -267,6 +267,21 @@ function CountBadge({ children }) {
   return <span className="company-count-badge">{children}</span>
 }
 
+function candidateMatchesSearch(candidate, searchTerm) {
+  if (!searchTerm) {
+    return true
+  }
+
+  return [
+    candidate.name,
+    candidate.role,
+    candidate.status,
+    candidate.confidence,
+    candidate.completedAt,
+    ...(candidate.reviewReasons || []),
+  ].some((value) => String(value).toLowerCase().includes(searchTerm))
+}
+
 function DropdownRow({ item, isActive = false, onClick }) {
   return (
     <button
@@ -290,8 +305,8 @@ function EmptyProjects({ type }) {
       <div className="company-empty-icon">
         <Icon name={isDraft ? 'pencil' : 'archive'} size={44} />
       </div>
-      <h2>{isDraft ? 'No Draft Projects' : 'No Archived Projects'}</h2>
-      <p>{isDraft ? "You don't have any draft hiring projects yet." : "You don't have any archived hiring projects yet."}</p>
+      <h2>{isDraft ? 'No draft projects' : 'No archived projects'}</h2>
+      <p>{isDraft ? 'New projects you save as drafts will appear here.' : 'Archived hiring projects will appear here.'}</p>
     </section>
   )
 }
@@ -302,20 +317,20 @@ function ProfileRequiredModal({ organizationName, error, onBack, onChange, onCon
       <section className="company-profile-modal" role="dialog" aria-modal="true" aria-labelledby="company-profile-title">
         <button type="button" className="company-modal-back-button" onClick={onBack}>
           <Icon name="arrowRight" size={16} />
-          Back to recruiter login
+          Back to home
         </button>
 
         <header>
-          <h2 id="company-profile-title">Profile information required</h2>
-          <p>Please fill in the required information to continue.</p>
+          <h2 id="company-profile-title">Set up your organization</h2>
+          <p>Add your organization name so candidates see a clear, trusted sender.</p>
         </header>
 
         <label className={error ? 'company-field has-error' : 'company-field'} htmlFor="organizationName">
-          <span>Organization Name</span>
+          <span>Organization name</span>
           <input
             id="organizationName"
             type="text"
-            placeholder="Enter your organization name"
+            placeholder="Acme Talent"
             value={organizationName}
             onChange={(event) => onChange(event.target.value)}
             autoFocus
@@ -346,11 +361,15 @@ function NewProjectModal({ jobTitle, projectName, onJobTitleChange, onProjectNam
         <button type="button" className="company-close-button" onClick={onClose} aria-label="Close dialog">
           <Icon name="close" />
         </button>
-        <h2 id="new-project-title">New Hiring Project</h2>
+        <header className="new-project-header">
+          <p className="eyebrow">New project</p>
+          <h2 id="new-project-title">Create a hiring project</h2>
+          <p>Name the role and project so candidates and your team can recognize this screening workflow.</p>
+        </header>
 
         <label className="company-field" htmlFor="jobTitle">
           <span>
-            Job Title <small>(visible to candidates)</small>
+            Job title <small>(visible to candidates)</small>
           </span>
           <input
             id="jobTitle"
@@ -364,7 +383,7 @@ function NewProjectModal({ jobTitle, projectName, onJobTitleChange, onProjectNam
 
         <label className="company-field" htmlFor="projectName">
           <span>
-            Project Name <small>(internal use only)</small>
+            Project name <small>(internal use only)</small>
           </span>
           <input
             id="projectName"
@@ -373,7 +392,7 @@ function NewProjectModal({ jobTitle, projectName, onJobTitleChange, onProjectNam
             value={projectName}
             onChange={(event) => onProjectNameChange(event.target.value)}
           />
-          <small>Auto-filled from Job Title - edit if you want.</small>
+          <small>Auto-filled from the job title. You can edit it before creating the project.</small>
         </label>
 
         <div className="new-project-actions">
@@ -412,6 +431,26 @@ function getScorePercent(candidate) {
   return Math.round((candidate.aggregateScore / candidate.maxScore) * 100)
 }
 
+function formatReviewReason(reason) {
+  const labels = {
+    HIGH_TAB_OUT: 'High tab switching',
+    LOW_COMMUNICATION: 'Communication needs review',
+    TEMPLATED_LANGUAGE: 'Templated language',
+  }
+
+  return labels[reason] || reason.toLowerCase().replace(/_/g, ' ')
+}
+
+function formatAuditType(type) {
+  const labels = {
+    TAB_OUT: 'Tab switch',
+    WHISPER_RESPONSE: 'Transcript saved',
+    GPT_SCORECARD: 'Scorecard saved',
+  }
+
+  return labels[type] || type.toLowerCase().replace(/_/g, ' ')
+}
+
 function makeProjectName(title) {
   return title.trim() ? `${title.trim()} - Project` : ''
 }
@@ -429,7 +468,7 @@ function makeJobId(title) {
 
 function InterviewPageTabs({ activePage, onChange }) {
   return (
-    <div className="interview-page-tabs" role="tablist" aria-label="AI Interview pages">
+    <div className="interview-page-tabs" role="tablist" aria-label="Interview pages">
       {menuPanels.interview.map((item) => (
         <button
           type="button"
@@ -447,18 +486,28 @@ function InterviewPageTabs({ activePage, onChange }) {
   )
 }
 
-function CandidateLeaderboardSection({ project, projects, rankedCandidates, selectedJobId, onJobChange, onReviewCandidate }) {
+function CandidateLeaderboardSection({
+  project,
+  projects,
+  rankedCandidates,
+  selectedJobId,
+  searchQuery,
+  onJobChange,
+  onReviewCandidate,
+}) {
+  const activeSearch = searchQuery.trim()
+
   return (
     <section className="recruiter-scoreboard">
       <header className="scoreboard-header">
         <div>
-          <p className="eyebrow">SRS-FR-14 / SRS-FR-15</p>
+          <p className="eyebrow">Candidate review</p>
           <h2>Candidate leaderboard</h2>
-          <p>Score, TAB_OUT, review flag, transcript, and audio.</p>
+          <p>Compare scores, tab-switch activity, review flags, transcripts, and audio in one place.</p>
           <div className="scoreboard-summary-list" aria-label="Recruiter review capabilities">
             <span><strong>Name</strong></span>
             <span><strong>Score</strong></span>
-            <span><strong>TAB_OUT</strong></span>
+            <span><strong>Tab switches</strong></span>
             <span><strong>Review</strong></span>
           </div>
         </div>
@@ -466,20 +515,33 @@ function CandidateLeaderboardSection({ project, projects, rankedCandidates, sele
 
       <div className="leaderboard-toolbar">
         <label htmlFor="jobFilter">
-          Job_ID
-          <select
-            id="jobFilter"
-            value={selectedJobId}
-            onChange={(event) => onJobChange(event.target.value)}
-          >
-            {projects.map((item) => (
-              <option value={item.jobId} key={item.jobId}>
-                {item.jobId} - {item.title}
-              </option>
-            ))}
-          </select>
+          Hiring project
+          <span className="project-select-wrap">
+            <select
+              id="jobFilter"
+              value={selectedJobId}
+              onChange={(event) => onJobChange(event.target.value)}
+            >
+              {projects.map((item) => (
+                <option value={item.jobId} key={item.jobId}>
+                  {item.jobId} - {item.title}
+                </option>
+              ))}
+            </select>
+            <Icon name="chevronDown" size={16} />
+          </span>
         </label>
-        <span><strong>{rankedCandidates.length}</strong> ranked candidates for {project.jobId}</span>
+        <span>
+          {activeSearch ? (
+            <>
+              <strong>{rankedCandidates.length}</strong> result{rankedCandidates.length === 1 ? '' : 's'} for "{activeSearch}"
+            </>
+          ) : (
+            <>
+              <strong>{rankedCandidates.length}</strong> candidates ranked for {project.title}
+            </>
+          )}
+        </span>
       </div>
 
       <div className="leaderboard-table" role="table" aria-label="Ranked candidate leaderboard">
@@ -487,7 +549,7 @@ function CandidateLeaderboardSection({ project, projects, rankedCandidates, sele
           <span role="columnheader">Rank</span>
           <span role="columnheader">Candidate</span>
           <span role="columnheader">Aggregate</span>
-          <span role="columnheader">TAB_OUT</span>
+          <span role="columnheader">Tab switches</span>
           <span role="columnheader">Manual review</span>
           <span role="columnheader">Completed</span>
           <span role="columnheader">Action</span>
@@ -512,8 +574,13 @@ function CandidateLeaderboardSection({ project, projects, rankedCandidates, sele
           </article>
         ))}
         {!rankedCandidates.length ? (
-          <div className="leaderboard-empty" role="row">
-            No candidates match this search.
+          <div className={activeSearch ? 'leaderboard-empty search-empty' : 'leaderboard-empty'} role="row">
+            <strong>{activeSearch ? 'No candidates found' : 'No candidates available'}</strong>
+            <p>
+              {activeSearch
+                ? `No candidate matches "${activeSearch}". Try another name, role, status, or confidence level.`
+                : 'This hiring project does not have ranked candidates yet.'}
+            </p>
           </div>
         ) : null}
       </div>
@@ -524,14 +591,14 @@ function CandidateLeaderboardSection({ project, projects, rankedCandidates, sele
 function InterviewSetsView({ project, rankedCandidates, needsReviewCount, onOpenCandidates }) {
   const setCards = [
     {
-      title: 'AI Interview Set',
+      title: 'AI interview set',
       type: 'Async interview',
       status: 'Live',
       prompts: 2,
       detail: 'Base question plus AI follow-up responses.',
     },
     {
-      title: 'CV Evaluation Set',
+      title: 'CV screening set',
       type: 'Document screen',
       status: 'Live',
       prompts: 1,
@@ -540,12 +607,12 @@ function InterviewSetsView({ project, rankedCandidates, needsReviewCount, onOpen
   ]
 
   return (
-    <section className="interview-sets-page" aria-label="AI Interview Sets">
+    <section className="interview-sets-page" aria-label="Interview sets">
       <header className="company-section-header">
         <div>
-          <p className="eyebrow">AI Interview Sets</p>
+          <p className="eyebrow">Interview sets</p>
           <h2>{project.title}</h2>
-          <p>Job_ID: {project.jobId}</p>
+          <p>{project.jobId}</p>
         </div>
         <button type="button" className="company-primary-button compact-action" onClick={onOpenCandidates}>
           View candidates
@@ -594,7 +661,7 @@ function ProjectOverviewSection({ project, rankedCandidates, needsReviewCount, o
       <header className="project-overview-header">
         <div>
           <p className="eyebrow">Project overview</p>
-          <h2>Hiring project setup</h2>
+          <h2>Screening workflow</h2>
         </div>
         <span>{project.assessments.length + 1} steps</span>
       </header>
@@ -603,15 +670,15 @@ function ProjectOverviewSection({ project, rankedCandidates, needsReviewCount, o
         <span>Status</span>
         <span>Candidates</span>
         <span>Assessments</span>
-        <span>Assessed candidates</span>
+        <span>Screened candidates</span>
         <span>Action</span>
       </div>
 
       <article className="project-row">
         <div>
           <h2>{project.name}</h2>
-          <p>Job_ID: {project.jobId}</p>
-          <p>Job Post: <span className="online-dot" /> {project.jobPost}</p>
+          <p>{project.jobId}</p>
+          <p>Job post: <span className="online-dot" /> {project.jobPost}</p>
           <small>{project.date}</small>
         </div>
         <div>
@@ -667,9 +734,9 @@ function CandidateDetailDrawer({ candidate, onClose }) {
         <header className="drawer-candidate-head">
           <span className="drawer-avatar">{candidate.name.charAt(0)}</span>
           <div>
-            <p className="eyebrow">SRS-FR-14 scorecard detail</p>
+            <p className="eyebrow">Scorecard detail</p>
             <h2 id="candidate-detail-title">{candidate.name}</h2>
-            <p>{candidate.role} - aggregate {formatAggregate(candidate)}</p>
+            <p>{candidate.role} - aggregate score {formatAggregate(candidate)}</p>
           </div>
         </header>
 
@@ -684,7 +751,7 @@ function CandidateDetailDrawer({ candidate, onClose }) {
           </article>
           <article className="drawer-summary-card">
             <strong>{candidate.tabOuts}</strong>
-            <span>TAB_OUT</span>
+            <span>Tab switches</span>
           </article>
           <article className="drawer-summary-card">
             <strong>{candidate.confidence}</strong>
@@ -692,7 +759,7 @@ function CandidateDetailDrawer({ candidate, onClose }) {
           </article>
           <article className="drawer-summary-card">
             <strong>{candidate.transcripts.length}</strong>
-            <span>Audio</span>
+            <span>Audio responses</span>
           </article>
         </div>
 
@@ -702,7 +769,7 @@ function CandidateDetailDrawer({ candidate, onClose }) {
             <div>
               <strong>Needs manual review</strong>
               {reviewReasons.map((reason) => (
-                <span className="review-reason-chip" key={reason}>{reason}</span>
+                <span className="review-reason-chip" key={reason}>{formatReviewReason(reason)}</span>
               ))}
             </div>
           </section>
@@ -721,7 +788,7 @@ function CandidateDetailDrawer({ candidate, onClose }) {
         </section>
 
         <section className="transcript-list">
-          <h3>Full transcript and response audio</h3>
+          <h3>Transcript and response audio</h3>
           {candidate.transcripts.map((item, index) => (
             <article className="transcript-card" key={`${candidate.id}-${item.responseId}`}>
               <div className="transcript-card-meta">
@@ -742,10 +809,10 @@ function CandidateDetailDrawer({ candidate, onClose }) {
         </section>
 
         <section className="audit-trail-list">
-          <h3>Immutable audit trail</h3>
+          <h3>Audit trail</h3>
           {candidate.auditEvents.map((event) => (
             <article className="audit-trail-row" key={`${candidate.id}-${event.type}-${event.time}`}>
-              <span>{event.type}</span>
+              <span>{formatAuditType(event.type)}</span>
               <div>
                 <strong>{event.time}</strong>
                 <p>{event.detail}</p>
@@ -781,14 +848,9 @@ export default function CompanyDashboard({ user, onBackToLanding, onOpenLogin, o
     .sort((first, second) => second.aggregateScore - first.aggregateScore)
   const normalizedSearch = searchQuery.trim().toLowerCase()
   const searchedCandidates = normalizedSearch
-    ? rankedCandidates.filter((candidate) => [
-      candidate.name,
-      candidate.role,
-      candidate.status,
-      candidate.confidence,
-      ...candidate.reviewReasons,
-    ].some((value) => value.toLowerCase().includes(normalizedSearch)))
+    ? rankedCandidates.filter((candidate) => candidateMatchesSearch(candidate, normalizedSearch))
     : rankedCandidates
+  const searchHasNoResults = Boolean(normalizedSearch) && searchedCandidates.length === 0
   const needsReviewCount = rankedCandidates.filter((candidate) => candidate.review).length
   const totalTabOuts = rankedCandidates.reduce((sum, candidate) => sum + candidate.tabOuts, 0)
   const totalAudioResponses = rankedCandidates.reduce((sum, candidate) => sum + candidate.transcripts.length, 0)
@@ -828,6 +890,29 @@ export default function CompanyDashboard({ user, onBackToLanding, onOpenLogin, o
     setSelectedCandidate(null)
   }
 
+  const handleSearchChange = (value) => {
+    const nextSearch = value.trim().toLowerCase()
+
+    setSearchQuery(value)
+
+    if (!nextSearch) {
+      return
+    }
+
+    setProjectStatus('active')
+    setActiveInterviewPage('candidates')
+    setActiveMenu('')
+
+    const currentProjectHasMatch = rankedCandidates.some((candidate) => candidateMatchesSearch(candidate, nextSearch))
+    const matchingProject = visibleProjects.find((item) => (
+      candidateLeaderboards[item.jobId] || []
+    ).some((candidate) => candidateMatchesSearch(candidate, nextSearch)))
+
+    if (!currentProjectHasMatch && matchingProject) {
+      setSelectedJobId(matchingProject.jobId)
+    }
+  }
+
   const openInterviewPage = (pageId) => {
     setActiveInterviewPage(pageId)
     setProjectStatus('active')
@@ -847,8 +932,8 @@ export default function CompanyDashboard({ user, onBackToLanding, onOpenLogin, o
       date: 'Draft',
       candidates: 0,
       assessments: [
-        `AI Interview (${jobTitle.trim()})`,
-        `CV Eval (${jobTitle.trim()})`,
+        `${jobTitle.trim()} async interview`,
+        `${jobTitle.trim()} CV screening`,
       ],
     }
 
@@ -890,7 +975,7 @@ export default function CompanyDashboard({ user, onBackToLanding, onOpenLogin, o
             onClick={() => setActiveMenu((current) => (current === 'interview' ? '' : 'interview'))}
             aria-expanded={activeMenu === 'interview'}
           >
-            AI Interview <Icon name="chevronDown" size={16} />
+            Interviews <Icon name="chevronDown" size={16} />
           </button>
         </nav>
 
@@ -954,7 +1039,7 @@ export default function CompanyDashboard({ user, onBackToLanding, onOpenLogin, o
               setActiveMenu('')
             }}
           >
-            <span>New Hiring Project</span>
+            <span>Create hiring project</span>
             <Icon name="plus" size={16} />
           </button>
         </section>
@@ -1050,7 +1135,7 @@ export default function CompanyDashboard({ user, onBackToLanding, onOpenLogin, o
               Recruiter Dashboard <CountBadge>{project.jobId}</CountBadge>
             </h1>
             <p>
-              <strong>Magic-link access.</strong> Ranked scores, TAB_OUT flags, transcripts, and audio.
+              <strong>Secure recruiter access.</strong> Ranked scores, tab-switch flags, transcripts, and audio.
             </p>
           </div>
 
@@ -1074,18 +1159,24 @@ export default function CompanyDashboard({ user, onBackToLanding, onOpenLogin, o
           </div>
 
           <div className="company-workspace-actions">
-            <label className="company-search" htmlFor="companySearch">
+            <label
+              className={searchHasNoResults ? 'company-search not-found' : 'company-search'}
+              htmlFor="companySearch"
+              onClick={(event) => event.currentTarget.querySelector('input')?.focus()}
+            >
               <Icon name="search" />
               <input
                 id="companySearch"
                 type="search"
                 placeholder="Search candidates"
                 value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
+                onChange={(event) => handleSearchChange(event.target.value)}
               />
+              {searchHasNoResults ? <span className="search-status">Not found</span> : null}
             </label>
-            <button type="button" className="company-icon-button dark" onClick={() => setIsNewProjectOpen(true)} aria-label="New hiring project">
+            <button type="button" className="company-icon-button dark company-new-project-button" onClick={() => setIsNewProjectOpen(true)} aria-label="New hiring project">
               <Icon name="plus" />
+              <span>New project</span>
             </button>
           </div>
         </div>
@@ -1099,9 +1190,9 @@ export default function CompanyDashboard({ user, onBackToLanding, onOpenLogin, o
                 <section className="recruiter-command-center" aria-label="Recruiter dashboard summary">
                   <div className="budget-guard-card auth-session-card">
                     <div className="auth-session-copy">
-                      <p className="eyebrow">SRS-FR-04</p>
+                      <p className="eyebrow">Session</p>
                       <h2>{authSession.status} recruiter session</h2>
-                      <p>Verified recruiter access.</p>
+                      <p>Verified access for this recruiter workspace.</p>
                     </div>
                     <div>
                       <dl className="auth-session-list">
@@ -1124,8 +1215,8 @@ export default function CompanyDashboard({ user, onBackToLanding, onOpenLogin, o
                   <div className="recruiter-metrics-grid">
                     <RecruiterMetric label="Scorecards" value={rankedCandidates.length} detail="Saved" icon="chart" />
                     <RecruiterMetric label="Review" value={needsReviewCount} detail="Flagged" icon="flag" tone="warning" />
-                    <RecruiterMetric label="TAB_OUT" value={totalTabOuts} detail="Events" icon="shield" />
-                    <RecruiterMetric label="Audio" value={totalAudioResponses} detail="Files" icon="mic" />
+                    <RecruiterMetric label="Tab switches" value={totalTabOuts} detail="Events" icon="shield" />
+                    <RecruiterMetric label="Audio" value={totalAudioResponses} detail="Responses" icon="mic" />
                   </div>
                 </section>
 
@@ -1153,6 +1244,7 @@ export default function CompanyDashboard({ user, onBackToLanding, onOpenLogin, o
                 projects={visibleProjects}
                 rankedCandidates={searchedCandidates}
                 selectedJobId={selectedJobId}
+                searchQuery={searchQuery}
                 onJobChange={handleJobChange}
                 onReviewCandidate={setSelectedCandidate}
               />
@@ -1171,7 +1263,7 @@ export default function CompanyDashboard({ user, onBackToLanding, onOpenLogin, o
         <ProfileRequiredModal
           organizationName={organizationName}
           error={organizationError}
-          onBack={onOpenLogin || onBackToLanding}
+          onBack={onBackToLanding}
           onChange={(value) => {
             setOrganizationName(value)
             if (value.trim()) {

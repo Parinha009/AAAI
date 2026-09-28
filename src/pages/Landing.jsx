@@ -2,61 +2,98 @@ import { useEffect, useRef, useState } from 'react'
 import Icon from '../components/Icon'
 
 const navItems = [
-  { id: 'workflow', label: 'How it works?' },
+  { id: 'workflow', label: 'How it works' },
   { id: 'pricing', label: 'Pricing' },
   { id: 'resources', label: 'Resources' },
-  { id: 'use-cases', label: 'Use Cases' },
-  { id: 'contact-us', label: 'Contact Us' },
+  { id: 'use-cases', label: 'Use cases' },
+  { id: 'contact-us', label: 'Contact' },
 ]
 
 const navPanels = {
   workflow: {
     eyebrow: 'How it works',
-    title: 'How it works',
-    copy: 'Choose your path, confirm your account, and continue into the right workspace.',
-    items: ['Pick a role', 'Verify your email', 'Continue to your dashboard'],
+    title: 'From application to shortlist',
+    copy: 'Move from candidate invite to shortlist with a simple, repeatable screening flow.',
+    items: [
+      {
+        title: 'Invite candidates',
+        copy: 'Share a secure interview link with clear instructions.',
+        icon: 'send',
+      },
+      {
+        title: 'Screen consistently',
+        copy: 'Collect CV details and structured responses in one format.',
+        icon: 'scanSearch',
+      },
+      {
+        title: 'Review and shortlist',
+        copy: 'Compare signals and decide who should move forward.',
+        icon: 'listChecks',
+      },
+    ],
   },
   pricing: {
     eyebrow: 'Pricing',
     title: 'Pricing',
-    copy: 'Start free and scale when your hiring workflow needs more capacity.',
-    items: ['Free to start', 'Scale when needed', 'No hidden setup fees'],
+    copy: 'Start with the core screening workflow, then scale when your team needs more volume.',
+    items: [
+      { title: 'Free starter workspace' },
+      { title: 'Transparent upgrade path' },
+      { title: 'No hidden setup fees' },
+    ],
   },
   resources: {
     eyebrow: 'Resources',
     title: 'Resources',
-    copy: 'Guides, setup help, and support material live here.',
-    items: ['Compare Flowmingo', 'Blog', 'FAQ - Help Centre', 'Careers'],
+    copy: 'Practical guidance for setting up interviews, evaluating responses, and supporting candidates.',
+    items: [
+      { title: 'Screening guides' },
+      { title: 'Interview templates' },
+      { title: 'Help center' },
+      { title: 'Product updates' },
+    ],
   },
   'use-cases': {
     eyebrow: 'Use cases',
-    title: 'Use Cases',
-    copy: 'Recruiters, hiring teams, and candidates can all use the same polished screening flow.',
-    items: ['For Candidates', 'View Sample Result', 'Take Demo Interview'],
+    title: 'Use cases',
+    copy: 'Support consistent screening across high-volume, early-career, and remote hiring workflows.',
+    items: [
+      { title: 'Graduate hiring' },
+      { title: 'Remote screening' },
+      { title: 'Technical interviews' },
+      { title: 'Candidate practice' },
+    ],
   },
   'contact-us': {
     eyebrow: 'Contact us',
-    title: 'Contact Us',
-    copy: 'Need help? Reach out and we can extend the flow for your team.',
-    items: ['Email support', 'Book a demo', 'Request onboarding help'],
+    title: 'Contact',
+    copy: 'Talk with AAAI about your hiring workflow, candidate experience, or recruiter setup.',
+    items: [
+      { title: 'Email support' },
+      { title: 'Book a demo' },
+      { title: 'Request onboarding help' },
+    ],
   },
 }
 
 const workflowSteps = [
   {
     count: '01',
-    title: 'Invite',
-    copy: 'Send a polished interview link with structured expectations and a calm candidate entry point.',
+    title: 'Invite candidates',
+    copy: 'Send candidates a secure interview link with clear instructions and a simple starting experience.',
+    icon: 'send',
   },
   {
     count: '02',
-    title: 'Screen',
-    copy: 'Collect CV context, async answers, tab events, and completion status without clutter.',
+    title: 'Screen consistently',
+    copy: 'Collect CV details and structured interview responses in one standardized workflow.',
+    icon: 'scanSearch',
   },
   {
     count: '03',
-    title: 'Shortlist',
-    copy: 'Review ranked signals, follow-up prompts, and recruiter-ready summaries in one place.',
+    title: 'Review and shortlist',
+    copy: 'Compare candidate signals, review responses, and decide who should move forward.',
+    icon: 'listChecks',
   },
 ]
 
@@ -72,14 +109,14 @@ const roleOptions = [
     id: 'company',
     title: 'Company / Recruiter',
     description: 'Manage projects, candidates, scorecards, and interview signals.',
-    action: 'Continue as company',
+    action: 'Open recruiter workspace',
     icon: 'company',
   },
   {
     id: 'candidate',
-    title: 'Candidate / Job Seeker',
+    title: 'Candidate',
     description: 'Open your profile, practice space, and interview workflow.',
-    action: 'Continue as candidate',
+    action: 'Open candidate workspace',
     icon: 'candidate',
   },
 ]
@@ -213,20 +250,20 @@ export default function Landing({
                   ) : null}
                 </div>
                 <button type="button" className="solid-button small" onClick={() => setIsDialogOpen(true)}>
-                  <span>Get Started</span>
+                  <span>Start screening</span>
                   <Icon name="arrowRight" />
                 </button>
               </>
             ) : (
               <>
                 <button type="button" className="ghost-button" onClick={onGoToLogin}>
-                  Login
+                  Log in
                 </button>
                 <button type="button" className="ghost-button" onClick={onGoToSignup}>
-                  Sign Up
+                  Sign up
                 </button>
                 <button type="button" className="solid-button small" onClick={() => setIsDialogOpen(true)}>
-                  <span>Get Started</span>
+                  <span>Start screening</span>
                   <Icon name="arrowRight" />
                 </button>
               </>
@@ -241,8 +278,14 @@ export default function Landing({
             <p>{panel.copy}</p>
             <div className="mega-card-grid">
               {panel.items.map((item) => (
-                <article className="mega-card" key={item}>
-                  {item}
+                <article className={item.copy ? 'mega-card has-copy' : 'mega-card'} key={item.title}>
+                  {item.icon ? (
+                    <span className="mega-card-icon" aria-hidden="true">
+                      <Icon name={item.icon} size={20} />
+                    </span>
+                  ) : null}
+                  <strong>{item.title}</strong>
+                  {item.copy ? <small>{item.copy}</small> : null}
                 </article>
               ))}
             </div>
@@ -261,36 +304,36 @@ export default function Landing({
           <span className="live-node live-node-three" />
         </div>
         <div className="hero-copy">
-          <p className="eyebrow">AI interview and CV screener</p>
-          <h1 id="hero-title">AI Interview &amp; CV Screener</h1>
+          <p className="eyebrow">AI-powered hiring platform</p>
+          <h1 id="hero-title">Screen smarter. Interview consistently. Hire with confidence.</h1>
           <p>
-            AAAI turns async interviews into clear hiring signal with structured prompts, fairer review,
-            and a candidate experience that feels considered from the first click.
+            AAAI brings CV screening and structured asynchronous interviews into one streamlined hiring workflow.
           </p>
 
           <div className="hero-actions">
             <button type="button" className="solid-button" onClick={() => setIsDialogOpen(true)}>
-              {currentUser ? 'Go to workspace' : 'Start free'}
+              {currentUser ? 'Go to workspace' : 'Start screening'}
             </button>
             {currentUser ? null : (
               <button type="button" className="soft-button" onClick={onGoToSignup}>
-                Create account
+                See how it works
               </button>
             )}
           </div>
+          <p className="hero-trust">No credit card required - set up in minutes.</p>
 
           <dl className="hero-metrics" aria-label="Product highlights">
             <div>
               <dt>Free</dt>
-              <dd>to launch</dd>
+              <dd>starter workspace</dd>
             </div>
             <div>
               <dt>24/7</dt>
-              <dd>async review</dd>
+              <dd>candidate access</dd>
             </div>
             <div>
               <dt>Zero</dt>
-              <dd>setup fees</dd>
+              <dd>hidden fees</dd>
             </div>
           </dl>
         </div>
@@ -305,7 +348,7 @@ export default function Landing({
           <div className="preview-grid">
             <section className="preview-panel preview-main">
               <div className="preview-panel-header">
-                <span>Candidate signal</span>
+                <span>Candidate signals</span>
                 <strong>92</strong>
               </div>
               <div className="signal-bars" aria-hidden="true">
@@ -321,14 +364,14 @@ export default function Landing({
                 <span>Interview</span>
                 <strong>Ready</strong>
               </div>
-              <p>Follow-up prompt generated after a calm, structured review.</p>
+              <p>Follow-up prompts are prepared from the candidate's earlier answers.</p>
             </section>
             <section className="preview-panel">
               <div className="preview-panel-header">
                 <span>CV match</span>
                 <strong>High</strong>
               </div>
-              <p>Role fit, communication, and required skills summarized.</p>
+              <p>Role fit, communication, and required skills are summarized for review.</p>
             </section>
           </div>
         </div>
@@ -336,15 +379,33 @@ export default function Landing({
 
       <section className="section-band" id="workflow" aria-labelledby="workflow-title">
         <div className="section-heading">
-          <p className="eyebrow">Workflow</p>
-          <h2 id="workflow-title">A quieter screening system with sharper outcomes.</h2>
-          <p>Each step removes operational noise so teams can spend more time on actual hiring judgment.</p>
+          <p className="eyebrow">How it works</p>
+          <h2 id="workflow-title">From application to shortlist, without the busywork.</h2>
+          <p>AAAI keeps candidate screening structured, consistent, and easy to review.</p>
         </div>
+
+        <aside className="workflow-visual" aria-label="Screening workflow summary">
+          <div className="workflow-visual-card">
+            <span className="workflow-visual-icon" aria-hidden="true">
+              <Icon name="spark" size={22} />
+            </span>
+            <div>
+              <strong>Structured signal, less manual review</strong>
+              <p>Every candidate follows the same flow, so recruiters can compare responses with more confidence.</p>
+            </div>
+          </div>
+          <div className="workflow-visual-row">
+            <span>CV</span>
+            <span>Interview</span>
+            <span>Scorecard</span>
+          </div>
+        </aside>
 
         <div className="workflow-grid">
           {workflowSteps.map((step) => (
             <article className="workflow-card" key={step.count}>
-              <span>{step.count}</span>
+              <span className="workflow-icon"><Icon name={step.icon} size={22} /></span>
+              <small>{step.count}</small>
               <h3>{step.title}</h3>
               <p>{step.copy}</p>
             </article>
@@ -355,10 +416,10 @@ export default function Landing({
       <section className="split-section" id="use-cases" aria-labelledby="use-cases-title">
         <div>
           <p className="eyebrow">Use cases</p>
-          <h2 id="use-cases-title">Designed for modern hiring rhythms.</h2>
+          <h2 id="use-cases-title">Built for hiring teams that need clear signal quickly.</h2>
           <p>
-            Use AAAI when you need consistent screening, respectful async interviews, and decision-ready
-            summaries without an overloaded recruiting stack.
+            Use AAAI when you need consistent screening, respectful asynchronous interviews, and decision-ready
+            summaries without adding another complicated hiring tool.
           </p>
         </div>
 
@@ -372,16 +433,16 @@ export default function Landing({
       <section className="pricing-section" id="pricing" aria-labelledby="pricing-title">
         <div className="pricing-copy">
           <p className="eyebrow">Pricing</p>
-          <h2 id="pricing-title">Start free. Scale only when the workflow earns it.</h2>
-          <p>No hidden setup fees, no bloated tiers, and no pressure to commit before your team has signal.</p>
+          <h2 id="pricing-title">Start screening before you commit to a larger plan.</h2>
+          <p>No hidden setup fees, no bloated tiers, and no pressure before your team has useful signal.</p>
         </div>
 
         <div className="pricing-card">
           <span>Starter</span>
           <strong>Free forever</strong>
-          <p>Launch async screening, invite candidates, and review core interview signals.</p>
+          <p>Launch asynchronous screening, invite candidates, and review core interview signals.</p>
           <button type="button" className="solid-button" onClick={() => setIsDialogOpen(true)}>
-            Choose your path
+            Start screening
           </button>
         </div>
       </section>
@@ -391,7 +452,7 @@ export default function Landing({
           <img src="/logo.svg" alt="" className="footer-logo" />
           <span>AAAI</span>
         </div>
-        <p>Premium async screening for teams that care about speed, structure, and candidate experience.</p>
+        <p>AI-powered candidate screening for teams that care about speed, structure, and candidate experience.</p>
       </footer>
 
       {isDialogOpen ? (
@@ -405,7 +466,7 @@ export default function Landing({
           >
             <div className="dialog-header dialog-header-center">
               <p className="eyebrow">Choose workspace</p>
-              <h2 id="role-dialog-title">Where should AAAI take you?</h2>
+              <h2 id="role-dialog-title">What would you like to do?</h2>
               <button type="button" className="icon-only-button" onClick={() => setIsDialogOpen(false)} aria-label="Close dialog">
                 <Icon name="close" />
               </button>

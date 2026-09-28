@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import Icon from '../components/Icon'
 
 const navItems = [
-  { id: 'intro', label: 'Private Introduction', icon: 'card' },
-  { id: 'cv', label: 'CV Evaluation', icon: 'document' },
-  { id: 'applied', label: 'Applied Jobs', icon: 'clipboard' },
+  { id: 'intro', label: 'Introduction', icon: 'mic' },
+  { id: 'cv', label: 'CV review', icon: 'document' },
+  { id: 'applied', label: 'Applications', icon: 'briefcase' },
 ]
 
 const appliedJobs = [
@@ -16,16 +16,16 @@ const initialNotifications = [
   {
     id: 'profile-viewed',
     dot: 'blue',
-    title: 'Your profile was viewed by TechCorp Asia',
-    message: 'TechCorp Asia opened your private introduction and CV summary. Your contact details remain private until you choose to respond.',
+    title: 'TechCorp Asia viewed your profile',
+    message: 'TechCorp Asia opened your introduction and CV summary. Your contact details stay private until you choose to respond.',
     time: '2 hours ago',
     unread: true,
   },
   {
     id: 'frontend-match',
     dot: 'green',
-    title: 'New job match: Frontend Developer',
-    message: 'A Frontend Developer role matches your profile preferences. Review the match from Applied Jobs or keep your profile updated for stronger recommendations.',
+    title: 'New match: Frontend Developer',
+    message: 'A Frontend Developer role matches your preferences. Review it from Applications or update your profile for stronger matches.',
     time: '5 hours ago',
     unread: true,
   },
@@ -174,6 +174,7 @@ function InterviewWorkspace({ candidateName, onClose }) {
   const [responses, setResponses] = useState([])
   const [tabOutCount, setTabOutCount] = useState(0)
   const [processingTarget, setProcessingTarget] = useState(null)
+  const [timeUpTarget, setTimeUpTarget] = useState(null)
   const isTimedStage = stage === 'base' || stage === 'follow_up'
   const activeQuestion = stage === 'follow_up' ? mockFollowUpQuestion : mockBaseQuestions[currentBaseIndex]
   const activeSeconds = stage === 'follow_up' ? followUpSeconds : baseSeconds
@@ -263,7 +264,14 @@ function InterviewWorkspace({ candidateName, onClose }) {
   const beginProcessing = (message, nextStage, options = {}) => {
     setIsRecording(Boolean(options.keepRecording))
     setProcessingTarget({ message, nextStage, keepRecording: Boolean(options.keepRecording) })
+    setTimeUpTarget(null)
     setStage('processing')
+  }
+
+  const beginTimeUp = (message, nextStage) => {
+    setIsRecording(false)
+    setTimeUpTarget({ message, nextStage })
+    setStage('time_up')
   }
 
   const beginBaseRound = () => {
@@ -274,6 +282,7 @@ function InterviewWorkspace({ candidateName, onClose }) {
     setIsRecording(false)
     setResponses([])
     setProcessingTarget(null)
+    setTimeUpTarget(null)
   }
 
   const saveResponse = (question, reason = 'manual') => {
@@ -283,7 +292,7 @@ function InterviewWorkspace({ candidateName, onClose }) {
         questionId: question.id,
         type: question.type,
         transcript: reason === 'timer'
-          ? 'Mock transcript saved automatically when the timer ended.'
+          ? 'Latest recorded response saved automatically when the timer ended.'
           : `Mock transcript captured for ${question.type === 'follow_up' ? 'the follow-up' : 'base question'} ${question.id}.`,
       },
     ])
@@ -297,16 +306,34 @@ function InterviewWorkspace({ candidateName, onClose }) {
     saveResponse(activeQuestion, reason)
 
     if (stage === 'base') {
-      if (currentBaseIndex < mockBaseQuestions.length - 1 && baseSeconds > 0) {
-        beginProcessing('Processing your answer before the next question...', 'next_base')
+      if (reason === 'timer') {
+        beginTimeUp('Your latest response has been saved. Continue to the follow-up question when you are ready.', 'follow_up')
         return
       }
 
-      beginProcessing('Processing your base responses and preparing a follow-up...', 'follow_up')
+      if (currentBaseIndex < mockBaseQuestions.length - 1 && baseSeconds > 0) {
+        beginProcessing('Saving your answer before the next question...', 'next_base')
+        return
+      }
+
+      beginProcessing('Saving your base responses and preparing a follow-up...', 'follow_up')
       return
     }
 
-    beginProcessing('Processing your follow-up and finalizing your interview...', 'completed')
+    if (reason === 'timer') {
+      beginTimeUp('Your latest follow-up response has been saved. Continue to finish your interview.', 'completed')
+      return
+    }
+
+    beginProcessing('Saving your follow-up response and finalizing your interview...', 'completed')
+  }
+
+  const continueAfterTimeUp = () => {
+    if (!timeUpTarget) {
+      return
+    }
+
+    beginProcessing(timeUpTarget.message, timeUpTarget.nextStage)
   }
 
   const toggleRecording = () => {
@@ -361,8 +388,10 @@ function InterviewWorkspace({ candidateName, onClose }) {
           <span>AAAI</span>
         </button>
         <div className="interview-session-meta">
-          <span><Icon name="shield" /> Paste locked</span>
-          <span><Icon name="flag" /> Tab outs {tabOutCount}</span>
+          <span title="To keep responses authentic, pasted text is disabled during the interview.">
+            <Icon name="shield" /> Paste disabled
+          </span>
+          <span><Icon name="flag" /> Tab switches: {tabOutCount}</span>
         </div>
         <button type="button" className="company-close-button interview-close" onClick={onClose} aria-label="Close interview">
           <Icon name="close" />
@@ -375,7 +404,7 @@ function InterviewWorkspace({ candidateName, onClose }) {
             <p className="eyebrow">Candidate consent</p>
             <h1 id="interview-title">Before your interview starts</h1>
             <p>
-              Hi {candidateName}. AAAI will record your audio, transcribe your answers, and create an AI-assisted
+              Hi {candidateName}. AAAI will record your audio, transcribe your answers, and prepare a structured
               scorecard for recruiter review.
             </p>
             <label className="consent-check">
@@ -384,7 +413,7 @@ function InterviewWorkspace({ candidateName, onClose }) {
                 checked={consentAccepted}
                 onChange={(event) => setConsentAccepted(event.target.checked)}
               />
-              <span>I understand this interview is recorded and evaluated with AI.</span>
+              <span>I understand this interview is recorded and reviewed with AI assistance.</span>
             </label>
             <button type="button" className="solid-button" disabled={!consentAccepted} onClick={beginBaseRound}>
               Continue to interview
@@ -397,16 +426,28 @@ function InterviewWorkspace({ candidateName, onClose }) {
             <div className="interview-panel-head">
               <span>
                 {stage === 'follow_up'
-                  ? 'Follow-up question - 2:30'
-                  : `Base question ${currentBaseIndex + 1} of ${mockBaseQuestions.length}`}
+                  ? 'Follow-up question'
+                  : `Question ${currentBaseIndex + 1} of ${mockBaseQuestions.length}`}
               </span>
-              <strong><Icon name="clock" /> {formatTime(activeSeconds)}</strong>
+              <strong><Icon name="clock" /> {formatTime(activeSeconds)} remaining</strong>
             </div>
+            {stage === 'base' ? (
+              <div className="interview-progress" aria-label={`Question ${currentBaseIndex + 1} of ${mockBaseQuestions.length}`}>
+                {mockBaseQuestions.map((question, index) => (
+                  <span
+                    key={question.id}
+                    className={index === currentBaseIndex ? 'active' : index < currentBaseIndex ? 'complete' : ''}
+                  >
+                    {index + 1}
+                  </span>
+                ))}
+              </div>
+            ) : null}
             <h1 id="interview-title" className="interview-question-title">{activeQuestion.prompt}</h1>
             <p className="interview-question-helper">
               {stage === 'follow_up'
-                ? 'Answer the generated follow-up within the 2:30 window.'
-                : 'Answer naturally. The base round uses one shared five-minute timer across all base questions.'}
+                ? 'Answer naturally. Focus on your reasoning and the outcome.'
+                : 'Answer naturally. Focus on the problem, your approach, and what you learned.'}
             </p>
             <div className={isRecording ? 'recording-orb active' : 'recording-orb'} aria-hidden="true">
               <Icon name="mic" size={34} />
@@ -415,10 +456,10 @@ function InterviewWorkspace({ candidateName, onClose }) {
               {activeSeconds === 0
                 ? 'Time is up. Your answer is being processed.'
                 : isRecording
-                  ? 'Recording in progress.'
+                  ? 'Recording...'
                   : answeredCurrentQuestion
                     ? 'Answer saved. Continue when you are ready.'
-                    : 'Ready when you are.'}
+                    : 'Ready to answer?'}
             </p>
             {isRecording ? (
               <div className="recording-action-note" role="status">
@@ -445,7 +486,7 @@ function InterviewWorkspace({ candidateName, onClose }) {
                 disabled={activeSeconds === 0}
               >
                 <Icon name={isRecording ? 'stop' : 'mic'} />
-                {isRecording ? 'Stop recording' : answeredCurrentQuestion ? 'Record again' : 'Record answer'}
+                {isRecording ? 'Stop recording' : answeredCurrentQuestion ? 'Record again' : 'Start recording'}
               </button>
               <button
                 type="button"
@@ -464,10 +505,36 @@ function InterviewWorkspace({ candidateName, onClose }) {
           </>
         ) : null}
 
+        {stage === 'time_up' ? (
+          <div className="interview-time-up" aria-live="assertive">
+            <span className="complete-mark warning-mark" aria-hidden="true">
+              <Icon name="clock" size={34} />
+            </span>
+            <p className="eyebrow">Time is up</p>
+            <h1 id="interview-title">Your latest response was saved.</h1>
+            <p>
+              AAAI saved the most recent response for this question. You can continue when you are ready.
+            </p>
+            <dl className="interview-complete-summary">
+              <div>
+                <dt>Responses saved</dt>
+                <dd>{responses.length}</dd>
+              </div>
+              <div>
+                <dt>Tab switches</dt>
+                <dd>{tabOutCount}</dd>
+              </div>
+            </dl>
+            <button type="button" className="solid-button" onClick={continueAfterTimeUp}>
+              Continue
+            </button>
+          </div>
+        ) : null}
+
         {stage === 'processing' ? (
           <div className="interview-processing" aria-live="polite">
             <span className="button-spinner" aria-hidden="true" />
-            <p className="eyebrow">Processing...</p>
+            <p className="eyebrow">Saving response</p>
             <h1 id="interview-title">{processingTarget?.message || 'Processing your response...'}</h1>
             <p>Please keep this tab open. The next step will appear automatically.</p>
           </div>
@@ -485,7 +552,7 @@ function InterviewWorkspace({ candidateName, onClose }) {
             </h1>
             <p>
               Your base answers and follow-up response have been submitted. The recruiter dashboard will show the
-              transcript, scoring rationale, TAB_OUT count, and audio playback when processing finishes.
+              transcript, scoring rationale, tab-switch count, and audio playback when processing finishes.
             </p>
             <dl className="interview-complete-summary">
               <div>
@@ -497,7 +564,7 @@ function InterviewWorkspace({ candidateName, onClose }) {
                 <dd>{responses.some((response) => response.type === 'follow_up') ? 'Submitted' : 'Skipped'}</dd>
               </div>
               <div>
-                <dt>Tab outs</dt>
+                <dt>Tab switches</dt>
                 <dd>{tabOutCount}</dd>
               </div>
             </dl>
@@ -528,7 +595,7 @@ function PrivateIntroductionRecorder({ candidateName, candidateKey, onStartQuest
   const [recordedAt, setRecordedAt] = useState('')
   const [recordedMimeType, setRecordedMimeType] = useState('video/webm')
   const [isPreviewReady, setIsPreviewReady] = useState(false)
-  const [recorderStatus, setRecorderStatus] = useState('No introduction evidence recorded yet.')
+  const [recorderStatus, setRecorderStatus] = useState('No introduction recorded yet.')
   const [recorderError, setRecorderError] = useState('')
   const previewRef = useRef(null)
   const recorderRef = useRef(null)
@@ -598,7 +665,7 @@ function PrivateIntroductionRecorder({ candidateName, candidateKey, onStartQuest
       setRecordedDuration(0)
       setRecordedAt('')
       setRecordedMimeType('video/webm')
-      setRecorderStatus('No introduction evidence recorded yet.')
+      setRecorderStatus('No introduction recorded yet.')
 
       try {
         const evidence = await loadIntroEvidence(candidateKey)
@@ -612,10 +679,10 @@ function PrivateIntroductionRecorder({ candidateName, candidateKey, onStartQuest
         setRecordedDuration(evidence.duration || 0)
         setRecordedAt(evidence.recordedAt || '')
         setRecordedMimeType(evidence.mimeType || evidence.blob.type || 'video/webm')
-        setRecorderStatus('Saved introduction evidence loaded from this browser.')
+        setRecorderStatus('Saved introduction loaded from this browser.')
       } catch {
         if (isCurrent) {
-          setRecorderStatus('No introduction evidence recorded yet.')
+          setRecorderStatus('No introduction recorded yet.')
         }
       }
     }
@@ -741,8 +808,8 @@ function PrivateIntroductionRecorder({ candidateName, candidateKey, onStartQuest
         setRecordedMimeType(evidenceBlob.type)
         setRecorderStatus(
           reachedLimit
-            ? 'You have reached the 5-minute recording limit. Your introduction evidence has been saved.'
-            : 'Introduction evidence saved. You can review or download it anytime from this browser.'
+            ? 'Your 5-minute limit is up. Your latest introduction has been saved.'
+            : 'Introduction saved. You can review or download it from this browser.'
         )
 
         try {
@@ -755,14 +822,14 @@ function PrivateIntroductionRecorder({ candidateName, candidateKey, onStartQuest
           })
 
           if (mountedRef.current && !reachedLimit) {
-            setRecorderStatus('Introduction evidence saved locally. You can review or download it anytime from this browser.')
+            setRecorderStatus('Introduction saved locally. You can review or download it from this browser.')
           }
         } catch {
           if (mountedRef.current) {
             setRecorderStatus(
               reachedLimit
-                ? 'You have reached the 5-minute recording limit. Your evidence is saved for this session.'
-                : 'Introduction evidence saved for this session. Download it to keep a copy.'
+                ? 'Your 5-minute limit is up. Your latest introduction is saved for this session.'
+                : 'Introduction saved for this session. Download it to keep a copy.'
             )
           }
         }
@@ -785,15 +852,15 @@ function PrivateIntroductionRecorder({ candidateName, candidateKey, onStartQuest
   }
 
   return (
-    <section className={isRecording || hasRecording ? 'intro-recorder has-media' : 'intro-recorder'} aria-label="Private introduction video evidence">
+    <section className={isRecording || hasRecording ? 'intro-recorder has-media' : 'intro-recorder'} aria-label="Private introduction recording">
       <header className="intro-recorder-head">
         <span className="sidebar-card-icon intro-recorder-icon" aria-hidden="true">
           <Icon name="mic" />
         </span>
         <div>
-          <span>Private intro</span>
+          <span>Introduction</span>
           <h3>Record a short introduction</h3>
-          <p>Use this as your reusable first impression when a company is a strong match.</p>
+          <p>Use this as a reusable first impression for matched companies.</p>
         </div>
         <strong className={isRecording ? 'record-limit-pill active' : 'record-limit-pill'}>
           <Icon name="clock" size={16} />
@@ -830,7 +897,7 @@ function PrivateIntroductionRecorder({ candidateName, candidateKey, onStartQuest
             <Icon name="shield" size={18} />
           </span>
           <div>
-            <strong>Private until matched</strong>
+            <strong>Private until there is a match</strong>
             <p>Recruiters only see this after your preferences and role goals line up.</p>
           </div>
         </div>
@@ -848,7 +915,7 @@ function PrivateIntroductionRecorder({ candidateName, candidateKey, onStartQuest
         {hasRecording && !isRecording ? (
           <a className="soft-button intro-download-button" href={recordedVideoUrl} download={downloadName}>
             <Icon name="document" />
-            Download evidence
+            Download recording
           </a>
         ) : null}
       </div>
@@ -920,14 +987,14 @@ export default function CandidateDashboard({ user, onOpenLogin, onOpenSignup, on
     if (activeView === 'cv') {
       return (
         <>
-          <DashboardHeader title="CV Evaluation" copy="Upload your CV and get instant AI-powered feedback." />
+          <DashboardHeader title="CV review" copy="Upload your CV to get a clear summary of strengths, gaps, and role fit." />
           <section className="dashboard-card upload-card">
             <label className="upload-zone" htmlFor="cv-upload">
               <span className="upload-icon" aria-hidden="true">
                 <Icon name="upload" />
               </span>
-              <strong>Drag & drop your CV here, or browse</strong>
-              <small>Supports PDF, DOCX, DOC - Max 5 MB</small>
+              <strong>Drop your CV here, or browse</strong>
+              <small>PDF, DOCX, or DOC - up to 5 MB</small>
               <input id="cv-upload" type="file" accept=".pdf,.doc,.docx" />
             </label>
           </section>
@@ -938,7 +1005,7 @@ export default function CandidateDashboard({ user, onOpenLogin, onOpenSignup, on
     if (activeView === 'applied') {
       return (
         <>
-          <DashboardHeader title="Applied Jobs" copy="Track the status of your job applications." />
+          <DashboardHeader title="Applications" copy="Track the status of roles you have applied for." />
           <section className="dashboard-card table-card">
             <table>
               <thead>
@@ -970,23 +1037,37 @@ export default function CandidateDashboard({ user, onOpenLogin, onOpenSignup, on
     return (
       <>
         <DashboardHeader
-          title="Private Introduction"
-          copy="Introduce yourself to hiring companies and let the right ones reach out to you."
+          title="Introduction"
+          copy="Record a short introduction that matched hiring teams can review."
         />
         <section className="intro-panel">
           <div className="intro-panel-main">
             <div className="intro-kicker-row">
-              <span>Private intro</span>
+              <span>Introduction</span>
             </div>
             <h2>Record a short introduction for matched companies.</h2>
             <p>
-              Create one reusable first impression for recruiters to review after your preferences and role goals
-              line up.
+              Create one reusable first impression for recruiters to review after your preferences and role goals line up.
             </p>
-            <ul>
-              <li><strong>Record once</strong> and reuse it for matched hiring teams</li>
-              <li><strong>Stay private</strong> until your preferences and role goals line up</li>
-              <li><strong>Update anytime</strong> before a recruiter reviews your profile</li>
+            <ul className="intro-benefit-list">
+              <li>
+                <span className="benefit-check" aria-hidden="true">
+                  <Icon name="check" size={16} />
+                </span>
+                <p><strong>Record once</strong> and reuse it for matched hiring teams</p>
+              </li>
+              <li>
+                <span className="benefit-check" aria-hidden="true">
+                  <Icon name="check" size={16} />
+                </span>
+                <p><strong>Stay private</strong> until your preferences and role goals line up</p>
+              </li>
+              <li>
+                <span className="benefit-check" aria-hidden="true">
+                  <Icon name="check" size={16} />
+                </span>
+                <p><strong>Update anytime</strong> before a recruiter reviews your profile</p>
+              </li>
             </ul>
             <PrivateIntroductionRecorder
               candidateName={firstName}
@@ -1117,7 +1198,7 @@ export default function CandidateDashboard({ user, onOpenLogin, onOpenSignup, on
 
       <div className="dashboard-layout">
         <aside className="dashboard-sidebar">
-          <h2>Welcome, {firstName}!</h2>
+        <h2>Welcome, {firstName}</h2>
           <nav className="dashboard-nav" aria-label="Candidate sections">
             {navItems.map((item) => (
               <button
@@ -1138,7 +1219,7 @@ export default function CandidateDashboard({ user, onOpenLogin, onOpenSignup, on
             <span className="sidebar-card-icon" aria-hidden="true">
               <Icon name="mic" />
             </span>
-            <h3>Have an upcoming interview?</h3>
+            <h3>Have an interview coming up?</h3>
             <p>Practice with AI first and get comfortable before it counts.</p>
             <button type="button" className="solid-button full-width" onClick={openPractice}>
               Start practicing
@@ -1153,11 +1234,12 @@ export default function CandidateDashboard({ user, onOpenLogin, onOpenSignup, on
         <a href="#privacy">Privacy Policy</a>
         <a href="#terms">Terms of Service</a>
         <a href="mailto:contact@aaai.ai">contact@aaai.ai</a>
-      </footer>
 
-      <button type="button" className="feedback-button">
-        Feedback / Support
-      </button>
+        <button type="button" className="feedback-button">
+          <Icon name="mail" size={18} />
+          Feedback
+        </button>
+      </footer>
 
       {isPracticeOpen ? (
         <div className="practice-backdrop" role="presentation" onMouseDown={() => setIsPracticeOpen(false)}>
@@ -1176,9 +1258,9 @@ export default function CandidateDashboard({ user, onOpenLogin, onOpenSignup, on
               <p>Practice with an AI session shaped like your real interview before it counts.</p>
             </header>
             <ul>
-              <li><strong>Paste your interview link</strong> - the one the company sent you</li>
-              <li><strong>Start a practice session</strong> built on that interview's format</li>
-              <li><strong>Do the real interview</strong> through the company's link, as usual</li>
+              <li><strong>Paste your interview link</strong> from the company</li>
+              <li><strong>Start a practice session</strong> shaped like the real interview</li>
+              <li><strong>Use the real link</strong> when you are ready to submit</li>
             </ul>
             <button type="button" className="solid-button full-width" onClick={() => startInterview()}>
               Start practicing

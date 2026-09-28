@@ -26,6 +26,7 @@ const emptyForm = {
   fullName: '',
   email: '',
   acceptTerms: false,
+  productUpdates: false,
 }
 
 const normalizeEmail = (email) => email.trim().toLowerCase()
@@ -115,8 +116,8 @@ export default function App() {
     const email = normalizeEmail(formData.email)
 
     if (!isValidEmail(email)) {
-      setAuthNotice('Enter a valid email to continue.')
-      showToast('error', 'Email needs a second look', 'Use a valid work or personal email address.')
+      setAuthNotice('Enter a valid email address.')
+      showToast('error', 'Check the email address', 'Use a valid work or personal email address.')
       return
     }
 
@@ -130,8 +131,8 @@ export default function App() {
         role: authRole,
         source: 'login',
       })
-      setAuthNotice('If that email is registered, a sign-in link is on its way.')
-      showToast('success', 'Magic link sent', `Check ${email} for your secure sign-in link.`)
+      setAuthNotice('Sign-in link sent. Check your inbox.')
+      showToast('success', 'Sign-in link sent', `Check ${email} for your secure sign-in link.`)
 
       setLoadingAction('')
     }, 650)
@@ -143,20 +144,20 @@ export default function App() {
     const email = normalizeEmail(formData.email)
 
     if (!fullName) {
-      setAuthNotice('Add your full name so your profile feels complete.')
+      setAuthNotice('Enter your full name.')
       showToast('error', 'Full name required', 'Add the name you want hiring teams to see.')
       return
     }
 
     if (!isValidEmail(email)) {
-      setAuthNotice('Enter a valid email to create your account.')
-      showToast('error', 'Email needs a second look', 'Use a valid email address for your account.')
+      setAuthNotice('Enter a valid email address.')
+      showToast('error', 'Check the email address', 'Use a valid email address for your account.')
       return
     }
 
     if (!formData.acceptTerms) {
-      setAuthNotice('Accept the screening terms before we email your sign-in link.')
-      showToast('error', 'Terms required', 'Confirm the screening terms to finish account setup.')
+      setAuthNotice('Agree to the Terms of Service and Privacy Policy to continue.')
+      showToast('error', 'Terms required', 'Confirm the required terms to finish account setup.')
       return
     }
 
@@ -171,8 +172,8 @@ export default function App() {
         role: authRole,
         source: 'signup',
       })
-      setAuthNotice('Check your inbox to finish signing in. No password is required.')
-      showToast('success', 'Magic link sent', `Check ${email} to verify your account.`)
+      setAuthNotice('Check your inbox to finish creating your account.')
+      showToast('success', 'Verification link sent', `Check ${email} to verify your account.`)
       setLoadingAction('')
     }, 760)
   }
@@ -189,7 +190,7 @@ export default function App() {
     setLoadingAction('resendMagicLink')
 
     window.setTimeout(() => {
-      showToast('success', 'Magic link resent', `Check ${email} for the newest sign-in link.`)
+      showToast('success', 'Sign-in link resent', `Check ${email} for the newest sign-in link.`)
       setLoadingAction('')
     }, 520)
   }

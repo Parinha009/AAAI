@@ -32,11 +32,11 @@ export default function Signup({
     >
       <header className="auth-header">
         <p className="eyebrow">{isLinkSent ? 'Verify your email' : 'Create account'}</p>
-        <h1>{isLinkSent ? 'Finish with your magic link.' : 'Build your AAAI profile.'}</h1>
+        <h1>{isLinkSent ? 'Finish creating your account.' : 'Create your AAAI account.'}</h1>
         <p>
           {isLinkSent
-            ? 'Use the emailed link to verify this account and start without a password.'
-            : 'Create one clean profile for interviews, CV screening, and follow-up decisions. No password required.'}
+            ? 'Use the emailed link to verify this account and continue without a password.'
+            : 'Set up your account to create interviews, screen candidates, and manage your shortlist.'}
         </p>
       </header>
 
@@ -49,8 +49,8 @@ export default function Signup({
             <div>
               <strong>Sent to {magicLinkRequest.email}</strong>
               <p>
-                {roleLabels[selectedRole]} access is ready to verify. This demo includes a local verification
-                button in place of an email inbox.
+                {roleLabels[selectedRole]} access is ready to verify. This demo includes a local verification button
+                in place of an email inbox.
               </p>
             </div>
           </section>
@@ -60,7 +60,7 @@ export default function Signup({
             className="submit-button"
             onClick={onOpenMagicLink}
           >
-            Open demo magic link
+            Open demo verification link
           </button>
 
           <div className="auth-link-actions">
@@ -71,7 +71,7 @@ export default function Signup({
               disabled={loadingAction === 'resendMagicLink'}
               aria-busy={loadingAction === 'resendMagicLink'}
             >
-              {loadingAction === 'resendMagicLink' ? 'Resending link...' : 'Resend link'}
+              {loadingAction === 'resendMagicLink' ? 'Resending link...' : 'Resend verification link'}
             </button>
             <button type="button" className="text-link" onClick={onChangeEmail}>
               Edit email
@@ -95,12 +95,12 @@ export default function Signup({
           </label>
 
           <label className="field-group" htmlFor="signup-email">
-            <span>Email</span>
+            <span>Work email</span>
             <input
               id="signup-email"
               name="email"
               type="email"
-              placeholder="you@company.com"
+              placeholder="name@company.com"
               value={formData.email}
               onChange={onChange}
               autoComplete="email"
@@ -115,12 +115,23 @@ export default function Signup({
               checked={formData.acceptTerms}
               onChange={onChange}
             />
-            <span>I agree to thoughtful, bias-aware screening and product updates.</span>
+            <span>I agree to the Terms of Service and Privacy Policy.</span>
+          </label>
+
+          <label className="terms-row" htmlFor="productUpdates">
+            <input
+              id="productUpdates"
+              name="productUpdates"
+              type="checkbox"
+              checked={formData.productUpdates}
+              onChange={onChange}
+            />
+            <span>Send me occasional product updates.</span>
           </label>
 
           <button type="submit" className="submit-button" disabled={isLoading} aria-busy={isLoading}>
             {isLoading ? <span className="button-spinner" aria-hidden="true" /> : null}
-            <span>{isLoading ? 'Sending magic link' : 'Send magic link'}</span>
+            <span>{isLoading ? 'Sending link' : 'Create account'}</span>
           </button>
         </form>
       )}

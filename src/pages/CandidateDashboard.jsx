@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { getQuestions, hasSession, postConsent, postTabOut, uploadResponse } from '../api'
 import Icon from '../components/Icon'
 
 const navItems = [
@@ -102,6 +103,15 @@ const getRecorderMimeType = () => {
 
 const getRecordingExtension = (mimeType) => (mimeType.includes('mp4') ? 'mp4' : 'webm')
 
+// Audio-only formats the backend accepts (FR-02 / FR-06): webm (Chrome/Firefox), mp4 (Safari).
+const getAudioMimeType = () => {
+  if (typeof window === 'undefined' || !window.MediaRecorder?.isTypeSupported) {
+    return ''
+  }
+
+  return ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'].find((type) => window.MediaRecorder.isTypeSupported(type)) || ''
+}
+
 const openIntroEvidenceDatabase = () => new Promise((resolve, reject) => {
   if (typeof window === 'undefined' || !window.indexedDB) {
     resolve(null)
@@ -174,8 +184,20 @@ function InterviewWorkspace({ candidateName, onClose }) {
   const [responses, setResponses] = useState([])
   const [tabOutCount, setTabOutCount] = useState(0)
   const [processingTarget, setProcessingTarget] = useState(null)
+  // Backend wiring: real questions + whether we're talking to the server.
+  const [baseQuestions, setBaseQuestions] = useState(mockBaseQuestions)
+  const [apiMode, setApiMode] = useState(false)
+  const [apiNotice, setApiNotice] = useState('')
+  const [isStarting, setIsStarting] = useState(false)
+  // Real microphone recording (FR-02).
+  const recorderRef = useRef(null)
+  const chunksRef = useRef([])
+  const streamRef = useRef(null)
+  const pendingBlobRef = useRef(null)
+  const apiModeRef = useRef(false)
+  const questionIdRef = useRef(null)
   const isTimedStage = stage === 'base' || stage === 'follow_up'
-  const activeQuestion = stage === 'follow_up' ? mockFollowUpQuestion : mockBaseQuestions[currentBaseIndex]
+  const activeQuestion = stage === 'follow_up' ? mockFollowUpQuestion : baseQuestions[currentBaseIndex]
   const activeSeconds = stage === 'follow_up' ? followUpSeconds : baseSeconds
   const answeredCurrentQuestion = responses.some((response) => response.questionId === activeQuestion?.id)
 
@@ -188,6 +210,10 @@ function InterviewWorkspace({ candidateName, onClose }) {
     const handleVisibilityChange = () => {
       if (document.hidden) {
         setTabOutCount((current) => current + 1)
+        // FR-12: log to the backend's immutable audit trail (fire-and-forget).
+        if (apiModeRef.current) {
+          postTabOut(questionIdRef.current)
+        }
       }
     }
 
@@ -245,12 +271,13 @@ function InterviewWorkspace({ candidateName, onClose }) {
 
     const timeoutId = window.setTimeout(() => {
       if (processingTarget.nextStage === 'next_base') {
-        setCurrentBaseIndex((current) => Math.min(current + 1, mockBaseQuestions.length - 1))
+        setCurrentBaseIndex((current) => Math.min(current + 1, baseQuestions.length - 1))
         setStage('base')
       } else if (processingTarget.nextStage === 'follow_up') {
         setFollowUpSeconds(FOLLOW_UP_SECONDS)
         setStage('follow_up')
       } else {
+        releaseMic()
         setStage('completed')
       }
 
@@ -266,7 +293,92 @@ function InterviewWorkspace({ candidateName, onClose }) {
     setStage('processing')
   }
 
-  const beginBaseRound = () => {
+  // Keep refs in sync so the tab-out listener always sees current values.
+  useEffect(() => {
+    apiModeRef.current = apiMode
+    questionIdRef.current = activeQuestion?.id ?? null
+  }, [apiMode, activeQuestion])
+
+  // Release the microphone if the workspace closes mid-interview.
+  useEffect(() => () => {
+    if (recorderRef.current && recorderRef.current.state !== 'inactive') {
+      recorderRef.current.stop()
+    }
+    streamRef.current?.getTracks().forEach((track) => track.stop())
+  }, [])
+
+  // --- Real microphone recording (FR-02) ------------------------------------
+  const releaseMic = () => {
+    streamRef.current?.getTracks().forEach((track) => track.stop())
+    streamRef.current = null
+  }
+
+  const startRecording = async () => {
+    try {
+      if (!streamRef.current) {
+        streamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true })
+      }
+      const mimeType = getAudioMimeType()
+      const recorder = new MediaRecorder(streamRef.current, mimeType ? { mimeType } : undefined)
+      chunksRef.current = []
+      pendingBlobRef.current = null // a new take replaces the previous one
+      recorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          chunksRef.current.push(event.data)
+        }
+      }
+      recorder.start()
+      recorderRef.current = recorder
+      setIsRecording(true)
+    } catch (error) {
+      setApiNotice(`Microphone unavailable: ${error.message}`)
+      setIsRecording(false)
+    }
+  }
+
+  // Stops the recorder and resolves with the recorded Blob (or null).
+  const stopRecording = () => new Promise((resolve) => {
+    const recorder = recorderRef.current
+    if (!recorder || recorder.state === 'inactive') {
+      resolve(null)
+      return
+    }
+    recorder.onstop = () => {
+      const blob = chunksRef.current.length
+        ? new Blob(chunksRef.current, { type: recorder.mimeType || 'audio/webm' })
+        : null
+      chunksRef.current = []
+      recorderRef.current = null
+      resolve(blob)
+    }
+    recorder.stop()
+  })
+
+  // --- Consent + questions from the backend (FR-01 / FR-05) ----------------
+  const beginBaseRound = async () => {
+    setIsStarting(true)
+    setApiNotice('')
+    let questions = mockBaseQuestions
+    let connected = false
+
+    if (hasSession()) {
+      try {
+        await postConsent()
+        const data = await getQuestions()
+        if (data?.questions?.length) {
+          questions = data.questions.map((q) => ({ id: q.question_id, type: 'base', prompt: q.text }))
+          connected = true
+        }
+      } catch (error) {
+        setApiNotice(`Server unavailable (${error.message}) — running the offline demo.`)
+      }
+    } else {
+      setApiNotice('Not signed in to the server — running the offline demo.')
+    }
+
+    setBaseQuestions(questions)
+    setApiMode(connected)
+    setIsStarting(false)
     setStage('base')
     setBaseSeconds(BASE_ROUND_SECONDS)
     setFollowUpSeconds(FOLLOW_UP_SECONDS)
@@ -276,28 +388,62 @@ function InterviewWorkspace({ candidateName, onClose }) {
     setProcessingTarget(null)
   }
 
-  const saveResponse = (question, reason = 'manual') => {
-    setResponses((current) => [
-      ...current.filter((response) => response.questionId !== question.id),
-      {
-        questionId: question.id,
-        type: question.type,
-        transcript: reason === 'timer'
-          ? 'Mock transcript saved automatically when the timer ended.'
-          : `Mock transcript captured for ${question.type === 'follow_up' ? 'the follow-up' : 'base question'} ${question.id}.`,
-      },
-    ])
+  const updateResponse = (questionId, transcript, responseId) => {
+    setResponses((current) => current.map((response) => (
+      response.questionId === questionId ? { ...response, transcript, responseId } : response
+    )))
   }
 
-  const submitCurrentAnswer = (reason = 'manual') => {
+  // --- Save one answer: stop recording + upload the audio (FR-06) ----------
+  const saveResponse = async (question, reason = 'manual', { keepRecording = false } = {}) => {
+    let blob = pendingBlobRef.current
+    if (recorderRef.current && recorderRef.current.state !== 'inactive') {
+      blob = await stopRecording()
+    }
+    pendingBlobRef.current = null
+    setIsRecording(false)
+
+    const alreadySaved = responses.some((response) => response.questionId === question.id)
+    if (!blob && alreadySaved) {
+      // Nothing new recorded — keep the earlier saved answer.
+      if (keepRecording) startRecording()
+      return
+    }
+
+    let note
+    if (!blob) {
+      note = reason === 'timer' ? 'Time ended before any audio was recorded.' : 'No audio recorded for this answer.'
+    } else if (!apiMode) {
+      note = 'Recorded locally (offline demo — not sent to the server).'
+    } else {
+      note = 'Uploading audio to the server...'
+    }
+
+    setResponses((current) => [
+      ...current.filter((response) => response.questionId !== question.id),
+      { questionId: question.id, type: question.type, transcript: note },
+    ])
+
+    if (blob && apiMode) {
+      uploadResponse({ questionId: question.id, type: question.type, blob })
+        .then((res) => updateResponse(question.id, `Uploaded — server status: ${res.status}.`, res.response_id))
+        .catch((error) => updateResponse(question.id, `Upload failed: ${error.message}`))
+    }
+
+    if (keepRecording) {
+      startRecording()
+    }
+  }
+
+  const submitCurrentAnswer = async (reason = 'manual') => {
     if (!activeQuestion) {
       return
     }
 
-    saveResponse(activeQuestion, reason)
+    await saveResponse(activeQuestion, reason)
 
     if (stage === 'base') {
-      if (currentBaseIndex < mockBaseQuestions.length - 1 && baseSeconds > 0) {
+      if (currentBaseIndex < baseQuestions.length - 1 && baseSeconds > 0) {
         beginProcessing('Processing your answer before the next question...', 'next_base')
         return
       }
@@ -309,46 +455,51 @@ function InterviewWorkspace({ candidateName, onClose }) {
     beginProcessing('Processing your follow-up and finalizing your interview...', 'completed')
   }
 
-  const toggleRecording = () => {
+  const toggleRecording = async () => {
     if (!isTimedStage || activeSeconds === 0 || stage === 'processing') {
       return
     }
 
     if (isRecording) {
+      pendingBlobRef.current = await stopRecording()
       setIsRecording(false)
       return
     }
 
-    setIsRecording(true)
+    await startRecording()
   }
 
-  const goToPreviousQuestion = () => {
+  const goToPreviousQuestion = async () => {
     if (stage !== 'base' || currentBaseIndex === 0) {
       return
     }
 
+    const keep = isRecording
+    await saveResponse(activeQuestion, 'manual', { keepRecording: keep })
     setCurrentBaseIndex((current) => Math.max(current - 1, 0))
   }
 
-  const goToNextQuestion = () => {
+  const goToNextQuestion = async () => {
     if (activeSeconds === 0) {
       return
     }
 
-    if (stage === 'base') {
-      saveResponse(activeQuestion)
+    const keep = isRecording
 
-      if (currentBaseIndex < mockBaseQuestions.length - 1) {
-        beginProcessing('Processing your answer before the next question...', 'next_base', { keepRecording: isRecording })
+    if (stage === 'base') {
+      await saveResponse(activeQuestion, 'manual', { keepRecording: keep })
+
+      if (currentBaseIndex < baseQuestions.length - 1) {
+        beginProcessing('Processing your answer before the next question...', 'next_base', { keepRecording: keep })
         return
       }
 
-      beginProcessing('Processing your base responses and preparing a follow-up...', 'follow_up', { keepRecording: isRecording })
+      beginProcessing('Processing your base responses and preparing a follow-up...', 'follow_up', { keepRecording: keep })
       return
     }
 
     if (stage === 'follow_up') {
-      saveResponse(activeQuestion)
+      await saveResponse(activeQuestion, 'manual')
       beginProcessing('Processing your follow-up and finalizing your interview...', 'completed')
     }
   }
@@ -363,6 +514,9 @@ function InterviewWorkspace({ candidateName, onClose }) {
         <div className="interview-session-meta">
           <span><Icon name="shield" /> Paste locked</span>
           <span><Icon name="flag" /> Tab outs {tabOutCount}</span>
+          {stage !== 'consent' ? (
+            <span>{apiMode ? 'Connected to server' : 'Offline demo'}</span>
+          ) : null}
         </div>
         <button type="button" className="company-close-button interview-close" onClick={onClose} aria-label="Close interview">
           <Icon name="close" />
@@ -386,11 +540,13 @@ function InterviewWorkspace({ candidateName, onClose }) {
               />
               <span>I understand this interview is recorded and evaluated with AI.</span>
             </label>
-            <button type="button" className="solid-button" disabled={!consentAccepted} onClick={beginBaseRound}>
-              Continue to interview
+            <button type="button" className="solid-button" disabled={!consentAccepted || isStarting} onClick={beginBaseRound}>
+              {isStarting ? 'Connecting...' : 'Continue to interview'}
             </button>
           </>
         ) : null}
+
+        {apiNotice ? <p className="recording-status" role="status">{apiNotice}</p> : null}
 
         {stage === 'base' || stage === 'follow_up' ? (
           <>
@@ -398,7 +554,7 @@ function InterviewWorkspace({ candidateName, onClose }) {
               <span>
                 {stage === 'follow_up'
                   ? 'Follow-up question - 2:30'
-                  : `Base question ${currentBaseIndex + 1} of ${mockBaseQuestions.length}`}
+                  : `Base question ${currentBaseIndex + 1} of ${baseQuestions.length}`}
               </span>
               <strong><Icon name="clock" /> {formatTime(activeSeconds)}</strong>
             </div>
@@ -455,7 +611,7 @@ function InterviewWorkspace({ candidateName, onClose }) {
               >
                 {stage === 'follow_up'
                   ? 'Finish'
-                  : currentBaseIndex === mockBaseQuestions.length - 1
+                  : currentBaseIndex === baseQuestions.length - 1
                     ? 'Follow-up'
                     : 'Next'}
                 <Icon name="arrowRight" />

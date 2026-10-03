@@ -35,3 +35,52 @@ export function getMe(sessionToken) {
     headers: { Authorization: `Bearer ${sessionToken}` },
   }).then(parse)
 }
+
+// --- Candidate interview (uses the stored session token) --------------------
+const SESSION_KEY = 'aaai_session'
+
+function authHeaders() {
+  const token = localStorage.getItem(SESSION_KEY)
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
+export const hasSession = () => Boolean(localStorage.getItem(SESSION_KEY))
+
+// FR-01 — record consent (unlocks the questions).
+export function postConsent() {
+  return fetch(`${API_BASE}/interview/consent`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ consent_version: 'v1', agreed: true }),
+  }).then(parse)
+}
+
+// FR-05 — ordered base questions + the 5:00 timer.
+export function getQuestions() {
+  return fetch(`${API_BASE}/interview/questions`, { headers: authHeaders() }).then(parse)
+}
+
+// FR-06 — upload one recorded answer (multipart). The backend allow-lists
+// plain MIME types, so strip codec params like ";codecs=opus".
+export function uploadResponse({ questionId, type, blob }) {
+  const mime = (blob.type || 'audio/webm').split(';')[0]
+  const ext = mime.includes('mp4') ? 'mp4' : 'webm'
+  const form = new FormData()
+  form.append('audio', new File([blob], `answer-${questionId}.${ext}`, { type: mime }))
+  form.append('question_id', String(questionId))
+  form.append('type', type)
+  return fetch(`${API_BASE}/interview/responses`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: form,
+  }).then(parse)
+}
+
+// FR-12 — fire-and-forget tab-out log; never interrupts the interview.
+export function postTabOut(questionId) {
+  return fetch(`${API_BASE}/interview/events/tab-out`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ question_id: questionId ?? 0 }),
+  }).then(parse).catch(() => null)
+}

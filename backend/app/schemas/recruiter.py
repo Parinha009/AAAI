@@ -100,3 +100,23 @@ class CandidateDetail(BaseModel):
     score: ScoreDetail | None
     tab_out_count: int
     review_reasons: list[str]
+
+
+# --- GET /jobs/{id}/candidates (v1.1 addition) — every candidate, scored or not ---
+class JobCandidate(BaseModel):
+    candidate_id: int
+    name: str | None
+    email: str
+    status: str
+    response_count: int
+    aggregate_score: int | None = Field(None, description="null until AI scoring has run")
+    scores: TraitScores | None = None
+    tab_out_count: int
+    needs_review: bool
+    review_reasons: list[str]
+
+
+class JobCandidatesResponse(BaseModel):
+    job_id: int
+    title: str
+    candidates: list[JobCandidate]

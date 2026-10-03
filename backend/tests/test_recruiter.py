@@ -98,3 +98,14 @@ def test_invite_rbac_and_validation(client, candidate_headers, recruiter_headers
     assert client.post(url, headers=recruiter_headers, json={"email": "not-an-email"}).status_code == 422
     assert client.post(url, headers=recruiter_headers,
                        json={"email": "recruiter@demo.local"}).status_code == 409                        # recruiter email
+
+
+def test_job_candidates_lists_scored_and_unscored(client, recruiter_headers, candidate_headers,
+                                                   new_candidate, scored_candidate, job_id):
+    r = client.get(f"{API}/jobs/{job_id}/candidates", headers=recruiter_headers)
+    assert r.status_code == 200
+    by_id = {c["candidate_id"]: c for c in r.json()["candidates"]}
+    assert by_id[scored_candidate["candidate_id"]]["aggregate_score"] == 20   # scored
+    assert by_id[new_candidate["candidate_id"]]["aggregate_score"] is None    # not scored yet — never faked
+    # candidates can't list other candidates
+    assert client.get(f"{API}/jobs/{job_id}/candidates", headers=candidate_headers).status_code == 403

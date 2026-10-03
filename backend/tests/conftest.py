@@ -1,14 +1,37 @@
-"""Shared pytest fixtures. Tests run against the live dev Postgres (Docker must be up)
-via FastAPI's in-process TestClient. Each candidate uses a unique email so tests
-don't collide.
+"""Shared pytest fixtures. Tests run via FastAPI's in-process TestClient against a
+throwaway `<dev db>_test` database on the same Postgres (Docker must be up). It is
+recreated + migrated each run, so tests never pollute the dev/demo data. Uploads
+go to a temp folder instead of media/. Each candidate uses a unique email.
 """
 
+import tempfile
 import uuid
+from pathlib import Path
 
-import pytest
-from fastapi.testclient import TestClient
+from alembic import command
+from alembic.config import Config
+from sqlalchemy import create_engine, text
+from sqlalchemy.engine import make_url
 
-from app.database import SessionLocal
+from app.config import settings
+
+# Repoint settings BEFORE app.database builds its engine.
+_dev_url = make_url(settings.database_url)
+_test_url = _dev_url.set(database=f"{_dev_url.database}_test")
+_admin = create_engine(_dev_url.set(database="postgres"), isolation_level="AUTOCOMMIT")
+with _admin.connect() as conn:
+    conn.execute(text(f'DROP DATABASE IF EXISTS "{_test_url.database}" WITH (FORCE)'))
+    conn.execute(text(f'CREATE DATABASE "{_test_url.database}"'))
+_admin.dispose()
+
+settings.database_url = _test_url.render_as_string(hide_password=False)
+settings.media_dir = tempfile.mkdtemp(prefix="aaai-test-media-")
+command.upgrade(Config(str(Path(__file__).resolve().parents[1] / "alembic.ini")), "head")
+
+import pytest  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+
+from app.database import SessionLocal  # noqa: E402
 from app.main import app
 from app.models import Candidate, Job, Recruiter, Score
 

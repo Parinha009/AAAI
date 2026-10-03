@@ -25,6 +25,8 @@ from app.schemas.recruiter import (
     CandidateInfo,
     InviteRequest,
     InviteResponse,
+    JobCandidate,
+    JobCandidatesResponse,
     JobInfo,
     JobSummary,
     JobsResponse,
@@ -253,3 +255,49 @@ def invite_candidate(job_id: int, payload: InviteRequest, db: Session = Depends(
         resp.dev_magic_link = link
         resp.dev_token = raw
     return resp
+
+
+
+@router.get(
+    "/jobs/{job_id}/candidates",
+    response_model=JobCandidatesResponse,
+    summary="All candidates for a job — scored or not (v1.1, FR-14/15)",
+    dependencies=[Depends(require_permission(Permission.VIEW_CANDIDATE))],
+)
+def job_candidates(job_id: int, db: Session = Depends(get_db)) -> JobCandidatesResponse:
+    """Unlike the leaderboard (scored candidates only), this lists everyone invited
+    to the job, so recruiters can review interviews before AI scoring exists.
+    Scored candidates come first (high to low), then the rest by invite order."""
+    job = db.get(Job, job_id)
+    if job is None:
+        raise api_error(404, "NOT_FOUND", "No such job")
+
+    items = []
+    for cand in db.execute(select(Candidate).where(Candidate.job_id == job_id)).scalars():
+        score = db.execute(select(Score).where(Score.candidate_id == cand.candidate_id)).scalar_one_or_none()
+        toc = _tab_out_count(db, cand.candidate_id)
+        reasons = _review_reasons(score, toc)
+        count = db.scalar(
+            select(func.count()).select_from(Response).where(Response.candidate_id == cand.candidate_id)
+        ) or 0
+        items.append(
+            JobCandidate(
+                candidate_id=cand.candidate_id,
+                name=cand.name,
+                email=cand.email,
+                status=cand.status,
+                response_count=count,
+                aggregate_score=_aggregate(score) if score else None,
+                scores=TraitScores(
+                    technical_skill=score.technical_skill,
+                    communication=score.communication,
+                    problem_solving=score.problem_solving,
+                    job_fit=score.job_fit,
+                ) if score else None,
+                tab_out_count=toc,
+                needs_review=bool(reasons),
+                review_reasons=reasons,
+            )
+        )
+    items.sort(key=lambda c: (c.aggregate_score is None, -(c.aggregate_score or 0), c.candidate_id))
+    return JobCandidatesResponse(job_id=job.job_id, title=job.title, candidates=items)

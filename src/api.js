@@ -1,6 +1,7 @@
 // Client for the AAAI backend auth API (passwordless magic-link, FR-04).
 // Backend runs at 127.0.0.1:8000; CORS allows the Vite dev origin.
-const API_BASE = 'http://127.0.0.1:8000/api/v1'
+const API_ORIGIN = 'http://127.0.0.1:8000'
+const API_BASE = `${API_ORIGIN}/api/v1`
 
 async function parse(res) {
   const data = await res.json().catch(() => null)
@@ -96,4 +97,23 @@ export function inviteCandidate(jobId, { email, name }) {
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ email, name: name || null }),
   }).then(parse)
+}
+
+// --- Recruiter: review real interviews (FR-14 / FR-15) ----------------------
+export function listJobCandidates(jobId) {
+  return fetch(`${API_BASE}/jobs/${jobId}/candidates`, { headers: authHeaders() }).then(parse)
+}
+
+export function getCandidateDetail(candidateId) {
+  return fetch(`${API_BASE}/candidates/${candidateId}`, { headers: authHeaders() }).then(parse)
+}
+
+// The audio endpoint needs the Bearer token, which a plain <audio src> can't
+// send — so fetch the recording as a Blob and hand back a playable object URL.
+export async function fetchAudioUrl(audioPath) {
+  const res = await fetch(`${API_ORIGIN}${audioPath}`, { headers: authHeaders() })
+  if (!res.ok) {
+    throw new Error(`Recording unavailable (${res.status})`)
+  }
+  return URL.createObjectURL(await res.blob())
 }

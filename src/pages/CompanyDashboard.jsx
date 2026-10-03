@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { hasSession, inviteCandidate, listJobs } from '../api'
+import { fetchAudioUrl, getCandidateDetail, hasSession, inviteCandidate, listJobCandidates, listJobs } from '../api'
 import Icon from '../components/Icon'
 
 const menuPanels = {
@@ -406,11 +406,118 @@ function RecruiterMetric({ label, value, detail, icon, tone = '' }) {
 }
 
 function formatAggregate(candidate) {
+  if (candidate.scored === false) {
+    return 'Not scored'
+  }
   return `${candidate.aggregateScore} / ${candidate.maxScore}`
 }
 
 function getScorePercent(candidate) {
   return Math.round((candidate.aggregateScore / candidate.maxScore) * 100)
+}
+
+// --- Live data from the backend (FR-14 / FR-15) ---
+const TRAIT_LABELS = [
+  ['technical_skill', 'Technical Skill'],
+  ['communication', 'Communication'],
+  ['problem_solving', 'Problem Solving'],
+  ['job_fit', 'Job Fit'],
+]
+
+const STATUS_LABELS = {
+  invited: 'Invited',
+  consented: 'Consented',
+  in_progress: 'Interviewing',
+  completed: 'Completed',
+  expired: 'Expired',
+}
+
+// GET /jobs/{id}/candidates row -> the shape the leaderboard renders.
+function mapLiveCandidate(c, jobTitle) {
+  const scored = c.aggregate_score !== null && c.aggregate_score !== undefined
+  return {
+    id: `live-${c.candidate_id}`,
+    apiCandidateId: c.candidate_id,
+    live: true,
+    scored,
+    name: c.name || c.email,
+    role: jobTitle,
+    aggregateScore: scored ? c.aggregate_score : 0,
+    maxScore: 20,
+    confidence: scored ? 'AI scored' : 'Awaiting AI',
+    tabOuts: c.tab_out_count,
+    status: c.needs_review ? 'Needs review' : scored ? 'Scored' : STATUS_LABELS[c.status] || c.status,
+    review: c.needs_review,
+    reviewReasons: c.review_reasons,
+    completedAt: c.response_count
+      ? `${c.response_count} answer${c.response_count === 1 ? '' : 's'} recorded`
+      : 'No answers yet',
+    responseCount: c.response_count,
+    auditEvents: [],
+    traits: scored && c.scores
+      ? TRAIT_LABELS.map(([key, label]) => ({ label, score: c.scores[key], rationale: '' }))
+      : [],
+    transcripts: [],
+  }
+}
+
+// GET /candidates/{id} -> the shape the detail drawer renders.
+function mapLiveDetail(base, detail) {
+  const rationale = detail.score?.rationale || {}
+  return {
+    ...base,
+    loading: false,
+    traits: detail.score
+      ? TRAIT_LABELS.map(([key, label]) => ({ label, score: detail.score[key], rationale: rationale[key] || '-' }))
+      : [],
+    transcripts: detail.responses.map((r) => ({
+      responseId: `R-${r.response_id}`,
+      type: r.type === 'follow_up' ? 'Follow-up' : 'Base question',
+      duration: new Date(r.created_at).toLocaleString(),
+      question: r.question_text || (r.type === 'follow_up' ? 'Follow-up question' : `Question ${r.question_id}`),
+      text: r.transcript || (r.no_speech_flag
+        ? 'No speech detected.'
+        : 'Transcript pending - AI transcription runs in a later slice.'),
+      audioPath: r.audio_url,
+    })),
+    auditEvents: [{
+      type: 'TAB_OUT',
+      time: `${detail.tab_out_count} logged`,
+      detail: `${detail.tab_out_count} tab switch(es) recorded in the immutable audit trail.`,
+    }],
+  }
+}
+
+// Plays a backend recording. The audio route needs the recruiter's token, so the
+// file is fetched with it and played from an in-memory object URL.
+function AuthAudio({ path }) {
+  const [src, setSrc] = useState('')
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let objectUrl = ''
+    let cancelled = false
+    fetchAudioUrl(path)
+      .then((url) => {
+        objectUrl = url
+        if (cancelled) {
+          URL.revokeObjectURL(url)
+        } else {
+          setSrc(url)
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.message)
+      })
+    return () => {
+      cancelled = true
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [path])
+
+  if (error) return <p className="invite-note error">{error}</p>
+  if (!src) return <p className="invite-note">Loading recording...</p>
+  return <audio controls src={src}>Audio preview unavailable.</audio>
 }
 
 function makeProjectName(title) {
@@ -779,7 +886,7 @@ function CandidateDetailDrawer({ candidate, onClose }) {
             <span>Aggregate</span>
           </article>
           <article className="drawer-summary-card">
-            <strong>{getScorePercent(candidate)}%</strong>
+            <strong>{candidate.scored === false ? '-' : `${getScorePercent(candidate)}%`}</strong>
             <span>Score</span>
           </article>
           <article className="drawer-summary-card">
@@ -791,7 +898,7 @@ function CandidateDetailDrawer({ candidate, onClose }) {
             <span>Confidence</span>
           </article>
           <article className="drawer-summary-card">
-            <strong>{candidate.transcripts.length}</strong>
+            <strong>{candidate.responseCount ?? candidate.transcripts.length}</strong>
             <span>Audio</span>
           </article>
         </div>
@@ -808,6 +915,10 @@ function CandidateDetailDrawer({ candidate, onClose }) {
           </section>
         ) : null}
 
+        {!candidate.traits.length ? (
+          <p className="invite-note">Not scored yet - AI scoring runs in a later slice.</p>
+        ) : null}
+
         <section className="trait-grid" aria-label="Trait scores">
           {candidate.traits.map((trait) => (
             <article className="trait-card" key={trait.label}>
@@ -822,6 +933,11 @@ function CandidateDetailDrawer({ candidate, onClose }) {
 
         <section className="transcript-list">
           <h3>Full transcript and response audio</h3>
+          {candidate.loading ? <p className="invite-note">Loading interview...</p> : null}
+          {candidate.detailError ? <p className="invite-note error">{candidate.detailError}</p> : null}
+          {!candidate.loading && !candidate.detailError && !candidate.transcripts.length ? (
+            <p className="invite-note">No recorded answers yet.</p>
+          ) : null}
           {candidate.transcripts.map((item, index) => (
             <article className="transcript-card" key={`${candidate.id}-${item.responseId}`}>
               <div className="transcript-card-meta">
@@ -834,9 +950,15 @@ function CandidateDetailDrawer({ candidate, onClose }) {
                 <Icon name="mic" size={16} />
                 <span>Embedded audio player</span>
               </div>
-              <audio controls src={item.audioSrc}>
-                Audio preview unavailable.
-              </audio>
+              {item.audioPath ? (
+                <AuthAudio path={item.audioPath} />
+              ) : item.audioSrc ? (
+                <audio controls src={item.audioSrc}>
+                  Audio preview unavailable.
+                </audio>
+              ) : (
+                <p className="invite-note">No recording for this answer.</p>
+              )}
             </article>
           ))}
         </section>
@@ -870,15 +992,18 @@ export default function CompanyDashboard({ user, onBackToLanding, onOpenLogin, o
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(true)
   const [isNewProjectOpen, setIsNewProjectOpen] = useState(false)
   const [selectedCandidate, setSelectedCandidate] = useState(null)
+  const [liveProjects, setLiveProjects] = useState([])
+  const [liveLeaderboards, setLiveLeaderboards] = useState({})
   const [jobTitle, setJobTitle] = useState('')
   const [projectName, setProjectName] = useState('')
   const profile = user || { name: 'Ben', email: 'ben@gmail.com' }
   const initial = (profile.name || 'B').charAt(0).toUpperCase()
   const organizationLabel = organizationName.trim() || 'KIT'
-  const visibleProjects = [...projects, ...customProjects]
+  const visibleProjects = [...liveProjects, ...projects, ...customProjects]
   const project = visibleProjects.find((item) => item.jobId === selectedJobId) || visibleProjects[0]
-  const rankedCandidates = [...(candidateLeaderboards[project.jobId] || [])]
-    .sort((first, second) => second.aggregateScore - first.aggregateScore)
+  const rankedCandidates = [...(liveLeaderboards[project.jobId] || candidateLeaderboards[project.jobId] || [])]
+    .sort((first, second) => (second.scored === false ? -1 : second.aggregateScore)
+      - (first.scored === false ? -1 : first.aggregateScore))
   const normalizedSearch = searchQuery.trim().toLowerCase()
   const searchedCandidates = normalizedSearch
     ? rankedCandidates.filter((candidate) => [
@@ -891,7 +1016,10 @@ export default function CompanyDashboard({ user, onBackToLanding, onOpenLogin, o
     : rankedCandidates
   const needsReviewCount = rankedCandidates.filter((candidate) => candidate.review).length
   const totalTabOuts = rankedCandidates.reduce((sum, candidate) => sum + candidate.tabOuts, 0)
-  const totalAudioResponses = rankedCandidates.reduce((sum, candidate) => sum + candidate.transcripts.length, 0)
+  const totalAudioResponses = rankedCandidates.reduce(
+    (sum, candidate) => sum + (candidate.responseCount ?? candidate.transcripts.length),
+    0,
+  )
   const activeProjectCount = visibleProjects.length
 
   useEffect(() => {
@@ -906,6 +1034,60 @@ export default function CompanyDashboard({ user, onBackToLanding, onOpenLogin, o
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [])
+
+  // Signed in as a recruiter: load real jobs + candidates. Mock data stays as the fallback.
+  useEffect(() => {
+    if (!hasSession()) {
+      return undefined
+    }
+    let cancelled = false
+    ;(async () => {
+      try {
+        const { jobs = [] } = await listJobs()
+        const boards = {}
+        const liveList = []
+        for (const job of jobs) {
+          const data = await listJobCandidates(job.job_id)
+          const key = `LIVE-${job.job_id}`
+          boards[key] = data.candidates.map((c) => mapLiveCandidate(c, job.title))
+          liveList.push({
+            jobId: key,
+            apiJobId: job.job_id,
+            live: true,
+            title: job.title,
+            name: `${job.title} (live)`,
+            jobPost: job.title,
+            date: 'Live',
+            candidates: job.candidate_count,
+            assessments: [`AI Interview (${job.title})`],
+          })
+        }
+        if (cancelled) return
+        setLiveLeaderboards(boards)
+        setLiveProjects(liveList)
+        if (liveList.length) setSelectedJobId(liveList[0].jobId)
+      } catch {
+        // Not a recruiter session or server down: keep the demo data.
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const handleReviewCandidate = async (candidate) => {
+    if (!candidate.live) {
+      setSelectedCandidate(candidate)
+      return
+    }
+    setSelectedCandidate({ ...candidate, loading: true })
+    try {
+      const detail = await getCandidateDetail(candidate.apiCandidateId)
+      setSelectedCandidate(mapLiveDetail(candidate, detail))
+    } catch (error) {
+      setSelectedCandidate({ ...candidate, loading: false, detailError: error.message })
+    }
+  }
 
   const handleOrganizationContinue = () => {
     if (!organizationName.trim()) {
@@ -1233,7 +1415,7 @@ export default function CompanyDashboard({ user, onBackToLanding, onOpenLogin, o
                   project={project}
                   rankedCandidates={rankedCandidates}
                   needsReviewCount={needsReviewCount}
-                  onOpenCandidate={setSelectedCandidate}
+                  onOpenCandidate={handleReviewCandidate}
                 />
               </>
             ) : null}
@@ -1254,7 +1436,7 @@ export default function CompanyDashboard({ user, onBackToLanding, onOpenLogin, o
                 rankedCandidates={searchedCandidates}
                 selectedJobId={selectedJobId}
                 onJobChange={handleJobChange}
-                onReviewCandidate={setSelectedCandidate}
+                onReviewCandidate={handleReviewCandidate}
               />
             ) : null}
           </>

@@ -6410,3 +6410,53 @@ img {
     bottom: 16px;
   }
 }
+
+/* Recruiter: invite a candidate (FR-04) */
+.invite-panel {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 20px;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.invite-panel h3 {
+  margin: 2px 0 4px;
+}
+
+.invite-panel p {
+  margin: 0;
+}
+
+.invite-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.invite-form input,
+.invite-form select {
+  flex: 1 1 180px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  font: inherit;
+  background: var(--surface);
+}
+
+.invite-note {
+  font-size: 14px;
+  color: #5b6b7c;
+}
+
+.invite-note.success {
+  color: #2e7d32;
+}
+
+.invite-note.error {
+  color: #c62828;
+}

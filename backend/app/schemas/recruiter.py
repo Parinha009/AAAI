@@ -2,7 +2,25 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+
+# --- POST /jobs/{id}/invite (v1.1 addition — recruiter invites a candidate) ---
+class InviteRequest(BaseModel):
+    email: str = Field(..., description="Candidate's email — the sign-in link is sent here")
+    name: str | None = Field(None, description="Optional display name")
+
+
+class InviteResponse(BaseModel):
+    candidate_id: int
+    job_id: int
+    email: str
+    name: str | None = None
+    candidate_status: str
+    invite_sent: bool = True
+    # Development-only helpers (hidden in production).
+    dev_magic_link: str | None = None
+    dev_token: str | None = None
 
 
 # --- GET /jobs (#13) ---

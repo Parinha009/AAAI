@@ -84,3 +84,16 @@ export function postTabOut(questionId) {
     body: JSON.stringify({ question_id: questionId ?? 0 }),
   }).then(parse).catch(() => null)
 }
+
+// --- Recruiter: invite a candidate (FR-04 — candidates are invited, not self-registered)
+export function listJobs() {
+  return fetch(`${API_BASE}/jobs`, { headers: authHeaders() }).then(parse)
+}
+
+export function inviteCandidate(jobId, { email, name }) {
+  return fetch(`${API_BASE}/jobs/${jobId}/invite`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ email, name: name || null }),
+  }).then(parse)
+}

@@ -34,6 +34,7 @@ class Permission(str, Enum):
     PLAY_AUDIO = "play_audio"              # FR-15 raw audio playback
     OVERRIDE_SCORE = "override_score"      # FR-15 human-in-the-loop override
     VIEW_BUDGET = "view_budget"            # FR-16 budget status
+    INVITE_CANDIDATE = "invite_candidate"  # FR-04 candidates are invited, never self-registered
 
     # --- Project Lead / System Administrator (SRS-2.3) ---
     MANAGE_QUESTIONS = "manage_questions"  # FR-05 base questions config
@@ -52,6 +53,7 @@ _RECRUITER = frozenset(
         Permission.PLAY_AUDIO,
         Permission.OVERRIDE_SCORE,
         Permission.VIEW_BUDGET,
+        Permission.INVITE_CANDIDATE,
     }
 )
 # Project Lead oversees the whole pipeline: recruiter view + configuration/QA.

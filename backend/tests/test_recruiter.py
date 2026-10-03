@@ -1,5 +1,7 @@
 """Recruiter dashboard: jobs, leaderboard, candidate detail, audio playback (FR-14/15)."""
 
+import uuid
+
 from tests.conftest import consent
 
 API = "/api/v1"
@@ -55,3 +57,44 @@ def test_audio_playback(client, login, new_candidate, recruiter_headers):
 
     # candidate lacks PLAY_AUDIO permission
     assert client.get(f"{API}/responses/{rid}/audio", headers=h).status_code == 403
+
+
+# --- Recruiter invites a candidate (FR-04: invited, never self-registered) ---
+
+def _new_email():
+    return f"invitee-{uuid.uuid4().hex[:10]}@test.local"
+
+
+def test_invite_new_candidate_can_sign_in(client, recruiter_headers, job_id):
+    email = _new_email()
+    r = client.post(f"{API}/jobs/{job_id}/invite", headers=recruiter_headers,
+                    json={"email": email, "name": "New Person"})
+    assert r.status_code == 201
+    body = r.json()
+    assert body["email"] == email
+    assert body["candidate_status"] == "invited"
+
+    # the invitee signs in with the link from their email
+    v = client.post(f"{API}/auth/verify", json={"token": body["dev_token"]})
+    assert v.status_code == 200
+    assert v.json()["role"] == "candidate"
+    assert v.json()["context"]["candidate_id"] == body["candidate_id"]
+
+
+def test_reinvite_resends_without_duplicating(client, recruiter_headers, job_id):
+    email = _new_email()
+    a = client.post(f"{API}/jobs/{job_id}/invite", headers=recruiter_headers, json={"email": email}).json()
+    b = client.post(f"{API}/jobs/{job_id}/invite", headers=recruiter_headers, json={"email": email}).json()
+    assert a["candidate_id"] == b["candidate_id"]   # same candidate
+    assert a["dev_token"] != b["dev_token"]         # fresh link each time
+
+
+def test_invite_rbac_and_validation(client, candidate_headers, recruiter_headers, job_id):
+    url = f"{API}/jobs/{job_id}/invite"
+    assert client.post(url, json={"email": _new_email()}).status_code == 401                            # not signed in
+    assert client.post(url, headers=candidate_headers, json={"email": _new_email()}).status_code == 403  # candidates can't invite
+    assert client.post(f"{API}/jobs/999999/invite", headers=recruiter_headers,
+                       json={"email": _new_email()}).status_code == 404                                  # no such job
+    assert client.post(url, headers=recruiter_headers, json={"email": "not-an-email"}).status_code == 422
+    assert client.post(url, headers=recruiter_headers,
+                       json={"email": "recruiter@demo.local"}).status_code == 409                        # recruiter email

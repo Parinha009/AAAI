@@ -5,21 +5,26 @@ gated by RBAC permissions. Review flags follow the contract §5 placeholder rule
 communication <= 2, tab_out_count >= 3, or a grading failure.
 """
 
+import re
 from pathlib import Path
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, status
 from fastapi.responses import FileResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.database import get_db
 from app.errors import api_error
-from app.models import AuditLog, Candidate, Job, Response, Score
+from app.magic_links import issue_magic_link
+from app.models import AuditLog, Candidate, Job, Recruiter, Response, Score
 from app.rbac import require_permission
 from app.roles import Permission
 from app.schemas.recruiter import (
     CandidateDetail,
     CandidateInfo,
+    InviteRequest,
+    InviteResponse,
     JobInfo,
     JobSummary,
     JobsResponse,
@@ -29,6 +34,8 @@ from app.schemas.recruiter import (
     ScoreDetail,
     TraitScores,
 )
+
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 router = APIRouter(tags=["recruiter"])
 
@@ -197,3 +204,52 @@ def response_audio(response_id: int, db: Session = Depends(get_db)) -> FileRespo
     if not path.exists():
         raise api_error(404, "NOT_FOUND", "Audio file is missing")
     return FileResponse(str(path), media_type=r.audio_mime or "application/octet-stream")
+
+
+@router.post(
+    "/jobs/{job_id}/invite",
+    response_model=InviteResponse,
+    response_model_exclude_none=True,  # hide dev_* helpers in production
+    status_code=status.HTTP_201_CREATED,
+    summary="Invite a candidate to a job — emails them a magic link (FR-04)",
+    dependencies=[Depends(require_permission(Permission.INVITE_CANDIDATE))],
+)
+def invite_candidate(job_id: int, payload: InviteRequest, db: Session = Depends(get_db)) -> InviteResponse:
+    """Candidates are invited by a recruiter, never self-registered (SRS-2.3 / FR-04).
+    Creates the candidate for this job (or re-uses an existing invite) and emails a
+    single-use sign-in link. Re-inviting the same email simply re-sends the link."""
+    job = db.get(Job, job_id)
+    if job is None:
+        raise api_error(404, "NOT_FOUND", "No such job")
+
+    email = payload.email.strip().lower()
+    if not _EMAIL_RE.match(email):
+        raise api_error(422, "VALIDATION_ERROR", "Enter a valid email address", {"field": "email"})
+    if db.query(Recruiter).filter(Recruiter.email == email).first() is not None:
+        raise api_error(409, "CONFLICT", "That email belongs to a recruiter account")
+
+    candidate = (
+        db.query(Candidate).filter(Candidate.email == email, Candidate.job_id == job_id).first()
+    )
+    if candidate is None:
+        candidate = Candidate(job_id=job_id, email=email, name=payload.name, status="invited")
+        db.add(candidate)
+        db.commit()
+        db.refresh(candidate)
+    elif payload.name and not candidate.name:
+        candidate.name = payload.name
+        db.commit()
+
+    raw, link = issue_magic_link(db, email=email, role="candidate", job_id=job_id)
+
+    resp = InviteResponse(
+        candidate_id=candidate.candidate_id,
+        job_id=job_id,
+        email=email,
+        name=candidate.name,
+        candidate_status=candidate.status,
+    )
+    if settings.environment == "development":
+        resp.dev_magic_link = link
+        resp.dev_token = raw
+    return resp

@@ -98,6 +98,10 @@ python -m app.seed   # prints JOB_ID (int), CANDIDATE_EMAIL, RECRUITER_EMAIL
 | GET | `/api/v1/jobs/{id}/leaderboard` | Ranked candidates + review flags (FR-14/15) | recruiter |
 | GET | `/api/v1/candidates/{id}` | Full drill-down: transcripts, scores, audio links (FR-14/15) | recruiter |
 | GET | `/api/v1/responses/{id}/audio` | Stream one recording for playback (FR-15) | recruiter + `play_audio` |
+| POST | `/api/v1/jobs/{id}/invite` | **v1.1:** invite a candidate by email — creates them + emails a magic link (FR-04) | recruiter + `invite_candidate` |
+
+> **Contract v1.1 note:** `POST /jobs/{id}/invite` is an *addition* to API Contract v1
+> (candidates are invited, never self-registered — SRS-2.3/FR-04). Log it with the Lead.
 
 **IDs are integers** (`job_id`, `candidate_id`, `response_id` …) per the contract.
 

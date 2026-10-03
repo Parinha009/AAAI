@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { hasSession, inviteCandidate, listJobs } from '../api'
 import Icon from '../components/Icon'
 
 const menuPanels = {
@@ -447,6 +448,103 @@ function InterviewPageTabs({ activePage, onChange }) {
   )
 }
 
+// Recruiter invites a candidate by email (SRS-FR-04: candidates are invited,
+// never self-registered). Uses the real jobs + invite endpoint on the backend.
+function InviteCandidatePanel() {
+  const [jobs, setJobs] = useState([])
+  const [jobId, setJobId] = useState('')
+  const [email, setEmail] = useState('')
+  const [name, setName] = useState('')
+  const [sending, setSending] = useState(false)
+  const [result, setResult] = useState(null)
+  const connected = hasSession()
+
+  useEffect(() => {
+    if (!connected) {
+      return
+    }
+    listJobs()
+      .then((data) => {
+        const list = data.jobs || []
+        setJobs(list)
+        if (list.length) setJobId(String(list[0].job_id))
+      })
+      .catch((error) => setResult({ type: 'error', text: `Could not load jobs: ${error.message}` }))
+  }, [connected])
+
+  const handleSubmit = async (event) => {
+    event.preventDefault()
+    if (!email.trim() || !jobId) {
+      return
+    }
+    setSending(true)
+    setResult(null)
+    try {
+      const res = await inviteCandidate(jobId, { email: email.trim(), name: name.trim() })
+      setResult({
+        type: 'success',
+        text: `Invite sent to ${res.email}. They'll receive a one-time sign-in link by email.`,
+        link: res.dev_magic_link,
+      })
+      setEmail('')
+      setName('')
+    } catch (error) {
+      setResult({ type: 'error', text: error.message })
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return (
+    <section className="invite-panel" aria-label="Invite a candidate">
+      <div>
+        <p className="eyebrow">SRS-FR-04</p>
+        <h3>Invite a candidate</h3>
+        <p>Candidates join by invitation: they get an email with a one-time sign-in link to start the interview.</p>
+      </div>
+      {connected ? (
+        <form className="invite-form" onSubmit={handleSubmit}>
+          <input
+            type="email"
+            placeholder="candidate@email.com"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            aria-label="Candidate email"
+            required
+          />
+          <input
+            type="text"
+            placeholder="Name (optional)"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            aria-label="Candidate name"
+          />
+          <select value={jobId} onChange={(event) => setJobId(event.target.value)} aria-label="Job">
+            {jobs.map((job) => (
+              <option key={job.job_id} value={job.job_id}>{job.job_id} - {job.title}</option>
+            ))}
+          </select>
+          <button type="submit" className="company-secondary-button compact" disabled={sending || !jobId}>
+            {sending ? 'Sending...' : 'Send invite'}
+          </button>
+        </form>
+      ) : (
+        <p className="invite-note">Sign in as a recruiter (magic link) to send invites.</p>
+      )}
+      {result ? (
+        <p className={`invite-note ${result.type}`} role="status">
+          {result.text}
+          {result.link ? (
+            <>
+              {' '}<a href={result.link}>Open sign-in link</a> (dev only — signs this browser in as the candidate)
+            </>
+          ) : null}
+        </p>
+      ) : null}
+    </section>
+  )
+}
+
 function CandidateLeaderboardSection({ project, projects, rankedCandidates, selectedJobId, onJobChange, onReviewCandidate }) {
   return (
     <section className="recruiter-scoreboard">
@@ -463,6 +561,8 @@ function CandidateLeaderboardSection({ project, projects, rankedCandidates, sele
           </div>
         </div>
       </header>
+
+      <InviteCandidatePanel />
 
       <div className="leaderboard-toolbar">
         <label htmlFor="jobFilter">

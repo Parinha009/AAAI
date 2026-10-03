@@ -13,6 +13,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app import pipeline
 from app.config import settings
 from app.database import get_db
 from app.errors import api_error
@@ -53,13 +54,13 @@ def _tab_out_count(db: Session, candidate_id: int) -> int:
     ) or 0
 
 
-def _review_reasons(score: Score | None, tab_out_count: int) -> list[str]:
+def _review_reasons(score: Score | None, tab_out_count: int, grading_failed: bool = False) -> list[str]:
     reasons: list[str] = []
     if score is not None and score.communication <= LOW_COMMUNICATION:
         reasons.append("LOW_COMMUNICATION")
     if tab_out_count >= HIGH_TAB_OUT:
         reasons.append("HIGH_TAB_OUT")
-    if score is not None and score.manual_review_flag:
+    if grading_failed or (score is not None and score.manual_review_flag):
         reasons.append("GRADING_FAILED")
     return reasons
 
@@ -138,6 +139,7 @@ def candidate_detail(candidate_id: int, db: Session = Depends(get_db)) -> Candid
         raise api_error(404, "NOT_FOUND", "No such candidate")
     job = db.get(Job, cand.job_id)
     base_questions = (job.base_questions or []) if job else []
+    follow_up_text = pipeline.follow_up_question(db, candidate_id)
 
     responses = db.execute(
         select(Response).where(Response.candidate_id == candidate_id).order_by(Response.type, Response.question_id)
@@ -148,6 +150,8 @@ def candidate_detail(candidate_id: int, db: Session = Depends(get_db)) -> Candid
         qtext = None
         if r.type == "base" and 1 <= r.question_id <= len(base_questions):
             qtext = base_questions[r.question_id - 1]
+        elif r.type == "follow_up":
+            qtext = follow_up_text
         resp_out.append(
             ResponseDetail(
                 response_id=r.response_id,
@@ -163,7 +167,7 @@ def candidate_detail(candidate_id: int, db: Session = Depends(get_db)) -> Candid
 
     score = db.execute(select(Score).where(Score.candidate_id == candidate_id)).scalar_one_or_none()
     toc = _tab_out_count(db, candidate_id)
-    reasons = _review_reasons(score, toc)
+    reasons = _review_reasons(score, toc, pipeline.scoring_failed(db, candidate_id))
 
     score_out = None
     if score is not None:
@@ -276,7 +280,7 @@ def job_candidates(job_id: int, db: Session = Depends(get_db)) -> JobCandidatesR
     for cand in db.execute(select(Candidate).where(Candidate.job_id == job_id)).scalars():
         score = db.execute(select(Score).where(Score.candidate_id == cand.candidate_id)).scalar_one_or_none()
         toc = _tab_out_count(db, cand.candidate_id)
-        reasons = _review_reasons(score, toc)
+        reasons = _review_reasons(score, toc, pipeline.scoring_failed(db, cand.candidate_id))
         count = db.scalar(
             select(func.count()).select_from(Response).where(Response.candidate_id == cand.candidate_id)
         ) or 0

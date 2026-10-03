@@ -67,11 +67,13 @@ docker compose up -d db
 pytest
 ```
 
-24 tests cover: auth (magic-link, verify, single-use, anti-enumeration), the consent
+34 tests cover: auth (magic-link, verify, single-use, anti-enumeration), the consent
 gate (403 → 201 → 200), audio upload validation (201 / 413 / 415), tab-out logging +
 audit-log immutability, RBAC on `budget-status`, the budget kill-switch guard, the
 recruiter dashboard (jobs, ranked leaderboard, candidate detail, audio playback), and
-email delivery (dev-log fallback + the SMTP send path).
+email delivery (dev-log fallback + the SMTP send path), and the AI pipeline (transcription,
+no-speech handling, exactly-one follow-up, JSON scoring + corrective retry + manual-review
+fallback, robotic-language down-weighting, budget freeze, audit trail).
 
 ## API routes — aligned to **API Contract v1**
 
@@ -92,6 +94,7 @@ python -m app.seed   # prints JOB_ID (int), CANDIDATE_EMAIL, RECRUITER_EMAIL
 | GET | `/api/v1/interview/questions` | Base questions + 5:00 timer (FR-05); **403 until consent** | Bearer + consent |
 | POST | `/api/v1/interview/responses` | Upload one answer — 20 MB cap, type allow-list (FR-02/06) → 201 | Bearer + consent |
 | GET | `/api/v1/interview/responses/{id}` | Poll transcription status (FR-07/17) | Bearer + consent |
+| GET | `/api/v1/interview/follow-up` | The one AI follow-up — 202 while generating, 200 when ready (FR-08) | Bearer + consent |
 | POST | `/api/v1/interview/events/tab-out` | Log a tab-switch (FR-12) → 202 | Bearer (candidate) |
 | GET | `/api/v1/interview/status` | Screen-flow driver (FR-17) | Bearer (candidate) |
 | GET | `/api/v1/system/budget-status` | AI spend vs the $10 cap (FR-16) | Bearer + `view_budget` |
@@ -112,7 +115,7 @@ python -m app.seed   # prints JOB_ID (int), CANDIDATE_EMAIL, RECRUITER_EMAIL
 `question_id` (0 = follow-up), and `type` (`base`/`follow_up`). Oversized → **413**
 (never persisted); bad type → **415**. Only the file *path* is stored (audio lives
 under `media/<candidate_id>/`). Upload returns `status: "transcribing"`; the frontend
-polls `GET /responses/{id}` until final. Transcription itself (FR-07) is still a stub.
+polls `GET /responses/{id}` until final.
 
 **Magic-link flow (FR-04):** `POST /auth/magic-link` `{email}` → in dev the 202 response
 includes `dev_magic_link` / `dev_token` (link is logged, not emailed) → `POST /auth/verify`
@@ -170,7 +173,31 @@ Recruiters see the state via `GET /system/budget-status` (`ok` / `paused`).
 > OpenAI dashboard** — an independent, provider-side backstop that no code can bypass.
 > This is a console setting, not something the backend can configure.
 
-### Not yet built (later slices)
-The **AI pipeline** — real Whisper transcription (FR-07), the GPT follow-up
-(`/interview/follow-up`, FR-08), and JSON scoring (FR-03/10). The budget hooks, upload
-storage, and recruiter dashboard are all ready for scores the moment it produces them.
+## AI pipeline (FR-07 / FR-08 / FR-03 / FR-10)
+
+Lives in [app/pipeline.py](app/pipeline.py) (steps) and [app/ai_client.py](app/ai_client.py)
+(provider). Everything runs as background tasks, so no request waits on OpenAI (FR-17).
+
+1. **Transcription (FR-07)** — each upload is sent to `whisper-1`. Silent audio (empty text
+   or high `no_speech_prob`) is stored as `no_speech`, never as an invented transcript;
+   errors become `failed`.
+2. **Follow-up (FR-08)** — `GET /interview/follow-up` starts generation once every base
+   answer is transcribed. `gpt-4o-mini` writes **exactly one** question, which is sanitised
+   (one sentence, injection-style text rejected) and stored in the audit log. If the AI
+   fails or the budget is frozen, a safe generic question is used so the candidate is
+   never stuck.
+3. **Scoring (FR-03 / FR-10)** — after the follow-up is transcribed: JSON mode, temperature
+   0, strict schema check, one corrective retry, then **manual review** (`GRADING_FAILED`)
+   instead of guessing. A deterministic marker-phrase check ("Furthermore", "In
+   conclusion", three-part structure…) feeds the prompt; if it fires and the model names no
+   trigger, communication is down-weighted by 1 and the trigger is written to the rationale.
+
+Every call is budget-guarded and charged (FR-16) and logged verbatim to `auditlogs` as an
+`AI_REQUEST` / `AI_RESPONSE` pair (FR-13).
+
+**Provider:** `AI_PROVIDER=auto` uses OpenAI when `OPENAI_API_KEY` is set, otherwise a
+clearly-labelled `[Simulated]` provider so the flow works offline. Tests always simulate.
+
+**Answers recorded before the pipeline existed:** once the key is set, run
+`python -m app.pipeline [candidate_id]` to transcribe and score them. It refuses to run
+without a real key, so demo data never gets simulated transcripts.

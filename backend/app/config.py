@@ -59,9 +59,15 @@ class Settings(BaseSettings):
     max_upload_bytes: int = 20 * 1024 * 1024  # hard 20 MB ceiling
     media_dir: str = "media"  # where uploaded audio is stored (path-only in DB)
 
-    # Reserved for later slices — not exercised yet.
+    # AI pipeline (FR-07 transcription, FR-08 follow-up, FR-03/10 scoring).
     openai_api_key: str = ""
     openai_monthly_budget_usd: float = 10.00
+    # "auto" = real OpenAI when OPENAI_API_KEY is set, otherwise a clearly-labelled
+    # simulated provider (so the flow works offline). "openai" / "fake" force one.
+    ai_provider: str = "auto"
+    openai_transcribe_model: str = "whisper-1"  # SRS FR-07
+    openai_chat_model: str = "gpt-4o-mini"  # SRS FR-03 / FR-08
+    ai_timeout_seconds: float = 60.0  # per OpenAI call; runs in the background (FR-17)
 
 
 settings = Settings()

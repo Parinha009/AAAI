@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { getQuestions, hasSession, postConsent, postTabOut, uploadResponse } from '../api'
+import { getFollowUp, getQuestions, hasSession, postConsent, postTabOut, uploadResponse } from '../api'
 import Icon from '../components/Icon'
 
 const navItems = [
@@ -184,6 +184,9 @@ function InterviewWorkspace({ candidateName, onClose }) {
   const [responses, setResponses] = useState([])
   const [tabOutCount, setTabOutCount] = useState(0)
   const [processingTarget, setProcessingTarget] = useState(null)
+  const [processingNote, setProcessingNote] = useState('')
+  // FR-08: the AI follow-up from the server (mock only in the offline demo).
+  const [followUpQuestion, setFollowUpQuestion] = useState(mockFollowUpQuestion)
   // Backend wiring: real questions + whether we're talking to the server.
   const [baseQuestions, setBaseQuestions] = useState(mockBaseQuestions)
   const [apiMode, setApiMode] = useState(false)
@@ -196,8 +199,9 @@ function InterviewWorkspace({ candidateName, onClose }) {
   const pendingBlobRef = useRef(null)
   const apiModeRef = useRef(false)
   const questionIdRef = useRef(null)
+  const uploadsRef = useRef([]) // in-flight uploads, awaited before asking for the follow-up
   const isTimedStage = stage === 'base' || stage === 'follow_up'
-  const activeQuestion = stage === 'follow_up' ? mockFollowUpQuestion : baseQuestions[currentBaseIndex]
+  const activeQuestion = stage === 'follow_up' ? followUpQuestion : baseQuestions[currentBaseIndex]
   const activeSeconds = stage === 'follow_up' ? followUpSeconds : baseSeconds
   const answeredCurrentQuestion = responses.some((response) => response.questionId === activeQuestion?.id)
 
@@ -269,6 +273,60 @@ function InterviewWorkspace({ candidateName, onClose }) {
       return undefined
     }
 
+    if (apiModeRef.current && processingTarget.nextStage !== 'next_base') {
+      let cancelled = false
+      const startedAt = Date.now()
+
+      ;(async () => {
+        // Make sure every answer reached the server first, so the AI sees all of them.
+        await Promise.allSettled(uploadsRef.current)
+
+        if (processingTarget.nextStage !== 'follow_up') {
+          if (!cancelled) {
+            releaseMic()
+            setStage('completed')
+            setProcessingTarget(null)
+          }
+          return
+        }
+
+        // FR-17: poll in the background; never surface a raw timeout to the candidate.
+        let failures = 0
+        while (!cancelled) {
+          try {
+            const data = await getFollowUp()
+            failures = 0
+            if (data?.text && !cancelled) {
+              setFollowUpQuestion({ id: 0, type: 'follow_up', prompt: data.text })
+              setFollowUpSeconds(data.follow_up_seconds || FOLLOW_UP_SECONDS)
+              setStage('follow_up')
+              setProcessingTarget(null)
+              return
+            }
+          } catch (error) {
+            failures += 1
+            if (failures >= 3 && !cancelled) {
+              setProcessingNote(`We can't reach the server right now (${error.message}). Retrying automatically...`)
+            }
+          }
+
+          const elapsed = (Date.now() - startedAt) / 1000
+          if (!cancelled && failures < 3) {
+            if (elapsed > 90) {
+              setProcessingNote('This is taking longer than usual. Please keep this tab open.')
+            } else if (elapsed > 15) {
+              setProcessingNote('Still preparing your follow-up question...')
+            }
+          }
+          await new Promise((resolve) => window.setTimeout(resolve, 2000))
+        }
+      })()
+
+      return () => {
+        cancelled = true
+      }
+    }
+
     const timeoutId = window.setTimeout(() => {
       if (processingTarget.nextStage === 'next_base') {
         setCurrentBaseIndex((current) => Math.min(current + 1, baseQuestions.length - 1))
@@ -290,6 +348,7 @@ function InterviewWorkspace({ candidateName, onClose }) {
   const beginProcessing = (message, nextStage, options = {}) => {
     setIsRecording(Boolean(options.keepRecording))
     setProcessingTarget({ message, nextStage, keepRecording: Boolean(options.keepRecording) })
+    setProcessingNote('')
     setStage('processing')
   }
 
@@ -386,6 +445,9 @@ function InterviewWorkspace({ candidateName, onClose }) {
     setIsRecording(false)
     setResponses([])
     setProcessingTarget(null)
+    setProcessingNote('')
+    setFollowUpQuestion(mockFollowUpQuestion)
+    uploadsRef.current = []
   }
 
   const updateResponse = (questionId, transcript, responseId) => {
@@ -425,9 +487,10 @@ function InterviewWorkspace({ candidateName, onClose }) {
     ])
 
     if (blob && apiMode) {
-      uploadResponse({ questionId: question.id, type: question.type, blob })
+      const upload = uploadResponse({ questionId: question.id, type: question.type, blob })
         .then((res) => updateResponse(question.id, `Uploaded — server status: ${res.status}.`, res.response_id))
         .catch((error) => updateResponse(question.id, `Upload failed: ${error.message}`))
+      uploadsRef.current.push(upload)
     }
 
     if (keepRecording) {
@@ -625,7 +688,7 @@ function InterviewWorkspace({ candidateName, onClose }) {
             <span className="button-spinner" aria-hidden="true" />
             <p className="eyebrow">Processing...</p>
             <h1 id="interview-title">{processingTarget?.message || 'Processing your response...'}</h1>
-            <p>Please keep this tab open. The next step will appear automatically.</p>
+            <p>{processingNote || 'Please keep this tab open. The next step will appear automatically.'}</p>
           </div>
         ) : null}
 

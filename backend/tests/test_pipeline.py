@@ -205,3 +205,26 @@ def test_candidate_completed_after_scoring(client, candidate_headers, new_candid
         assert db.get(Candidate, new_candidate["candidate_id"]).status == "completed"
     finally:
         db.close()
+
+
+def test_provider_selection(monkeypatch):
+    from app import ai_client
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "ai_provider", "auto")
+    monkeypatch.setattr(settings, "openai_api_key", "")
+    monkeypatch.setattr(settings, "groq_api_key", "")
+    assert ai_client.get_client().name == "fake"
+
+    monkeypatch.setattr(settings, "groq_api_key", "gsk_test")
+    groq = ai_client.get_client()
+    assert groq.name == "groq" and groq.billable is False  # free tier: never charged
+    assert groq._client.base_url.host == "api.groq.com"
+    assert groq.transcribe_model.startswith("whisper")
+
+    monkeypatch.setattr(settings, "openai_api_key", "sk-test")
+    openai = ai_client.get_client()
+    assert openai.name == "openai" and openai.billable and openai.chat_model == "gpt-4o-mini"
+
+    monkeypatch.setattr(settings, "ai_provider", "groq")
+    assert ai_client.get_client().name == "groq"

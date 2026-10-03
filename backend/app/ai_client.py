@@ -1,13 +1,14 @@
 """AI provider layer (FR-07 / FR-08 / FR-03).
 
-Two interchangeable clients with the same two calls:
-- `transcribe(path, mime)`  -> speech-to-text (Whisper-1)
-- `chat(messages, ...)`     -> GPT-4o-mini completion (plain text or JSON object)
+Interchangeable clients with the same two calls:
+- `transcribe(path, mime)`  -> speech-to-text (Whisper)
+- `chat(messages, ...)`     -> chat completion (plain text or JSON object)
 
-`OpenAIClient` makes the real calls. `FakeAIClient` returns clearly-labelled simulated
-output so the whole interview flow runs without an API key (and tests never spend money).
-`get_client()` picks one from settings: AI_PROVIDER=auto uses OpenAI only when
-OPENAI_API_KEY is set.
+`OpenAIClient` makes real calls to any OpenAI-compatible API: OpenAI itself (Whisper-1 +
+GPT-4o-mini, the SRS models, billed) or Groq (Whisper large-v3 + Llama, free tier).
+`FakeAIClient` returns clearly-labelled simulated output so the flow runs with no key
+(and tests never call out). `get_client()` picks from settings - AI_PROVIDER=auto uses
+OpenAI if OPENAI_API_KEY is set, else Groq if GROQ_API_KEY is set, else the simulator.
 """
 
 import json
@@ -38,13 +39,27 @@ class ChatResult:
 
 
 class OpenAIClient:
-    name = "openai"
+    """Real calls to an OpenAI-compatible API (OpenAI or Groq)."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        name: str,
+        api_key: str,
+        transcribe_model: str,
+        chat_model: str,
+        base_url: str | None = None,
+        billable: bool = True,
+    ) -> None:
         from openai import OpenAI  # imported lazily so the fake path needs no SDK
 
+        self.name = name
+        self.transcribe_model = transcribe_model
+        self.chat_model = chat_model
+        self.billable = billable  # False = free tier: nothing charged to the budget (FR-16)
         self._client = OpenAI(
-            api_key=settings.openai_api_key,
+            api_key=api_key,
+            base_url=base_url,
             timeout=settings.ai_timeout_seconds,
             max_retries=2,
         )
@@ -53,7 +68,7 @@ class OpenAIClient:
         p = Path(path)
         with p.open("rb") as fh:
             result = self._client.audio.transcriptions.create(
-                model=settings.openai_transcribe_model,
+                model=self.transcribe_model,
                 file=(p.name, fh, mime or "audio/webm"),
                 response_format="verbose_json",
                 temperature=0.0,
@@ -74,7 +89,7 @@ class OpenAIClient:
     def chat(self, messages: list[dict], *, json_mode: bool = False, max_tokens: int = 400) -> ChatResult:
         kwargs = {"response_format": {"type": "json_object"}} if json_mode else {}
         result = self._client.chat.completions.create(
-            model=settings.openai_chat_model,
+            model=self.chat_model,
             messages=messages,
             temperature=0.0,
             max_tokens=max_tokens,
@@ -93,6 +108,9 @@ class FakeAIClient:
     """Deterministic stand-in used when no API key is configured (and in tests)."""
 
     name = "fake"
+    transcribe_model = "simulated"
+    chat_model = "simulated"
+    billable = False
 
     def transcribe(self, path: str, mime: str | None) -> Transcription:
         size = Path(path).stat().st_size if Path(path).exists() else 0
@@ -121,8 +139,30 @@ class FakeAIClient:
         )
 
 
+def _openai() -> OpenAIClient:
+    return OpenAIClient(
+        name="openai", api_key=settings.openai_api_key,
+        transcribe_model=settings.openai_transcribe_model, chat_model=settings.openai_chat_model,
+    )
+
+
+def _groq() -> OpenAIClient:
+    return OpenAIClient(
+        name="groq", api_key=settings.groq_api_key, base_url=settings.groq_base_url,
+        transcribe_model=settings.groq_transcribe_model, chat_model=settings.groq_chat_model,
+        billable=False,
+    )
+
+
 def get_client() -> OpenAIClient | FakeAIClient:
     provider = settings.ai_provider.lower()
-    if provider == "openai" or (provider == "auto" and settings.openai_api_key):
-        return OpenAIClient()
+    if provider == "openai":
+        return _openai()
+    if provider == "groq":
+        return _groq()
+    if provider == "auto":
+        if settings.openai_api_key:
+            return _openai()
+        if settings.groq_api_key:
+            return _groq()
     return FakeAIClient()

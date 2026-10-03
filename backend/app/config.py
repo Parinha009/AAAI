@@ -62,11 +62,16 @@ class Settings(BaseSettings):
     # AI pipeline (FR-07 transcription, FR-08 follow-up, FR-03/10 scoring).
     openai_api_key: str = ""
     openai_monthly_budget_usd: float = 10.00
-    # "auto" = real OpenAI when OPENAI_API_KEY is set, otherwise a clearly-labelled
-    # simulated provider (so the flow works offline). "openai" / "fake" force one.
+    # "auto" = OpenAI if OPENAI_API_KEY is set, else Groq if GROQ_API_KEY is set, else a
+    # clearly-labelled simulated provider. "openai" / "groq" / "fake" force one.
     ai_provider: str = "auto"
     openai_transcribe_model: str = "whisper-1"  # SRS FR-07
     openai_chat_model: str = "gpt-4o-mini"  # SRS FR-03 / FR-08
+    # Groq (free tier, OpenAI-compatible) - a dev/demo alternative to the SRS models.
+    groq_api_key: str = ""
+    groq_base_url: str = "https://api.groq.com/openai/v1"
+    groq_transcribe_model: str = "whisper-large-v3-turbo"
+    groq_chat_model: str = "llama-3.3-70b-versatile"
     ai_timeout_seconds: float = 60.0  # per OpenAI call; runs in the background (FR-17)
 
 

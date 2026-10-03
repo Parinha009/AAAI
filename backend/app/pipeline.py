@@ -23,7 +23,6 @@ from sqlalchemy import exists, select, text
 
 from app import budget
 from app.ai_client import get_client
-from app.config import settings
 from app.database import SessionLocal, engine
 from app.models import AuditLog, Candidate, Job, Response, Score
 
@@ -82,15 +81,11 @@ def _audit(db, candidate_id: int, job_id: int, event_type: str, payload: dict) -
     db.commit()
 
 
-def _model_name(client, model: str) -> str:
-    return model if client.name == "openai" else "simulated"
-
-
 def _charge_chat(db, client, result, candidate_id: int, job_id: int) -> None:
-    if client.name == "openai":
+    if client.billable:
         budget.charge(
             db, budget.estimate_gpt_cost(result.input_tokens, result.output_tokens),
-            model=settings.openai_chat_model, candidate_id=candidate_id, job_id=job_id,
+            model=client.chat_model, candidate_id=candidate_id, job_id=job_id,
         )
 
 
@@ -175,7 +170,7 @@ def _transcribe(db, resp: Response) -> None:
         return
 
     client = get_client()
-    model = _model_name(client, settings.openai_transcribe_model)
+    model = client.transcribe_model
     _audit(db, cid, jid, "AI_REQUEST", {
         "kind": "transcription", "provider": client.name, "model": model,
         "response_id": resp.response_id, "audio_path": resp.audio_path, "audio_mime": resp.audio_mime,
@@ -192,7 +187,7 @@ def _transcribe(db, resp: Response) -> None:
         })
         return
 
-    if client.name == "openai":
+    if client.billable:
         budget.charge(db, budget.estimate_whisper_cost(result.duration_seconds),
                       model=model, candidate_id=cid, job_id=jid)
 
@@ -295,7 +290,7 @@ def generate_follow_up(candidate_id: int) -> None:
                 messages = _follow_up_messages(job, _base_answers(db, candidate_id, job))
                 _audit(db, candidate_id, job.job_id, "AI_REQUEST", {
                     "kind": "follow_up", "provider": client.name,
-                    "model": _model_name(client, settings.openai_chat_model), "messages": messages,
+                    "model": client.chat_model, "messages": messages,
                 })
                 try:
                     result = client.chat(messages, max_tokens=120)
@@ -443,7 +438,7 @@ def score_candidate(candidate_id: int) -> None:
             flags = robotic_flags([a for _, _, a in items])
             messages = _scoring_messages(job, items, flags)
             client = get_client()
-            model = _model_name(client, settings.openai_chat_model)
+            model = client.chat_model
             card = None
 
             for attempt in (1, 2):  # FR-03 step 4: one corrective retry, then manual review
@@ -531,8 +526,8 @@ def reprocess(candidate_id: int | None = None) -> None:
 if __name__ == "__main__":
     import sys
 
-    if get_client().name != "openai" and "--allow-fake" not in sys.argv:
-        sys.exit("OPENAI_API_KEY is not set - refusing to write simulated transcripts into real "
-                 "data. Add the key to .env (or pass --allow-fake).")
+    if get_client().name == "fake" and "--allow-fake" not in sys.argv:
+        sys.exit("No AI key set (OPENAI_API_KEY or GROQ_API_KEY) - refusing to write simulated "
+                 "transcripts into real data. Add a key to .env (or pass --allow-fake).")
     ids = [int(a) for a in sys.argv[1:] if a.isdigit()]
     reprocess(ids[0] if ids else None)

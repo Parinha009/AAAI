@@ -195,9 +195,18 @@ Lives in [app/pipeline.py](app/pipeline.py) (steps) and [app/ai_client.py](app/a
 Every call is budget-guarded and charged (FR-16) and logged verbatim to `auditlogs` as an
 `AI_REQUEST` / `AI_RESPONSE` pair (FR-13).
 
-**Provider:** `AI_PROVIDER=auto` uses OpenAI when `OPENAI_API_KEY` is set, otherwise a
-clearly-labelled `[Simulated]` provider so the flow works offline. Tests always simulate.
+**Provider:** `AI_PROVIDER=auto` picks OpenAI if `OPENAI_API_KEY` is set, else **Groq** if
+`GROQ_API_KEY` is set, else a clearly-labelled `[Simulated]` provider. Tests always simulate.
 
-**Answers recorded before the pipeline existed:** once the key is set, run
+| Provider | Transcription | Follow-up + scoring | Cost |
+|---|---|---|---|
+| OpenAI (SRS §2.5) | `whisper-1` | `gpt-4o-mini` | ~$0.03 / interview, charged to the FR-16 budget |
+| Groq (free tier) | `whisper-large-v3-turbo` | `llama-3.3-70b-versatile` | $0 - nothing charged; free-tier rate limits apply |
+
+> **SRS deviation:** SRS §2.5 requires OpenAI Whisper-1 + GPT-4o-mini. Groq is used for
+> development/demo; switching back is config-only (`OPENAI_API_KEY` in `.env`). Raise the
+> change with the Lead (NFR-07) before the final release.
+
+**Answers recorded before the pipeline existed:** once a key (OpenAI or Groq) is set, run
 `python -m app.pipeline [candidate_id]` to transcribe and score them. It refuses to run
 without a real key, so demo data never gets simulated transcripts.

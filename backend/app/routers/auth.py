@@ -1,6 +1,7 @@
 """Auth routes (API Contract v1 §3.2) — passwordless magic-link (FR-04)."""
 
 import hashlib
+import logging
 import secrets
 from datetime import datetime, timedelta, timezone
 
@@ -23,6 +24,7 @@ from app.schemas.auth import (
 from app.security import create_session_token, get_session, session_expires_at
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+logger = logging.getLogger("aaai.auth")
 
 
 def _hash(raw: str) -> str:
@@ -60,7 +62,11 @@ def magic_link(payload: MagicLinkRequest, db: Session = Depends(get_db)) -> Magi
         db.commit()
 
         link = f"{settings.frontend_base_url}/auth/callback?token={raw}"
-        send_magic_link(payload.email, link)
+        # Email delivery must never break sign-in: log failures, still return 202.
+        try:
+            send_magic_link(payload.email, link)
+        except Exception:
+            logger.exception("Failed to send magic-link email to %s", payload.email)
         if settings.environment == "development":
             resp.dev_magic_link = link
             resp.dev_token = raw

@@ -1,4 +1,5 @@
-@import "tailwindcss/index.css";
+/* Removed stray `@import "tailwindcss/index.css"` — Tailwind is NOT installed and
+   isn't used (styling here is plain CSS). The import broke the Vite build. See CLAUDE.md. */
 
 :root {
   font-family: "Manrope", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;

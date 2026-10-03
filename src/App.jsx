@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { getMe, requestMagicLink, verifyToken } from './api'
 import Icon from './components/Icon'
 import CandidateDashboard from './pages/CandidateDashboard'
 import CompanyDashboard from './pages/CompanyDashboard'
@@ -82,6 +83,32 @@ export default function App() {
     })
   }
 
+  // Handle the emailed magic link: /auth/callback?token=... (or any ?token=...).
+  // On load, verify the token with the backend and sign the user in.
+  useEffect(() => {
+    const token = new URLSearchParams(window.location.search).get('token')
+    if (!token) {
+      return
+    }
+    // Strip the token from the URL so a refresh/bookmark can't reuse it.
+    window.history.replaceState({}, '', '/')
+    ;(async () => {
+      try {
+        const session = await verifyToken(token)
+        await getMe(session.session_token)
+        localStorage.setItem('aaai_session', session.session_token)
+        const dashboard = session.role === 'recruiter' ? 'company' : 'candidate'
+        setCurrentUser({ name: session.role === 'recruiter' ? 'Recruiter' : 'Candidate', email: '' })
+        setCurrentRole(dashboard)
+        setMode(dashboard)
+        showToast('success', 'Signed in', `Verified by the server as ${session.role}.`)
+      } catch (error) {
+        setMode('login')
+        showToast('error', 'Sign-in link invalid or expired', error.message)
+      }
+    })()
+  }, [])
+
   const resetForm = (overrides = {}) => {
     setFormData({ ...emptyForm, ...overrides })
   }
@@ -110,7 +137,7 @@ export default function App() {
     }))
   }
 
-  const handleRequestMagicLink = (event) => {
+  const handleRequestMagicLink = async (event) => {
     event.preventDefault()
     const email = normalizeEmail(formData.email)
 
@@ -123,18 +150,24 @@ export default function App() {
     setLoadingAction('magicLink')
     setAuthNotice('')
 
-    window.setTimeout(() => {
+    try {
+      // Real backend call (SRS-FR-04). In dev the response carries dev_token.
+      const res = await requestMagicLink(email)
       setFormData((current) => ({ ...current, email }))
       setMagicLinkRequest({
         email,
         role: authRole,
         source: 'login',
+        devToken: res.dev_token || null,
       })
-      setAuthNotice('If that email is registered, a sign-in link is on its way.')
+      setAuthNotice(res.message || 'If that email is registered, a sign-in link is on its way.')
       showToast('success', 'Magic link sent', `Check ${email} for your secure sign-in link.`)
-
+    } catch (error) {
+      setAuthNotice(error.message)
+      showToast('error', 'Could not send link', error.message)
+    } finally {
       setLoadingAction('')
-    }, 650)
+    }
   }
 
   const handleSignup = (event) => {
@@ -199,12 +232,42 @@ export default function App() {
     setAuthNotice('')
   }
 
-  const handleOpenMagicLink = () => {
+  const handleOpenMagicLink = async () => {
     if (!magicLinkRequest) {
       return
     }
 
     const email = magicLinkRequest.email
+
+    // Real backend verification when we have a server-issued token (dev flow).
+    if (magicLinkRequest.devToken) {
+      setLoadingAction('openMagicLink')
+      try {
+        const session = await verifyToken(magicLinkRequest.devToken)
+        const me = await getMe(session.session_token)
+        localStorage.setItem('aaai_session', session.session_token)
+
+        const profile = { name: magicLinkRequest.name || email.split('@')[0], email }
+        if (!existingAccounts.has(email)) existingAccounts.add(email)
+        accountProfiles.set(email, profile)
+
+        const dashboard = session.role === 'recruiter' ? 'company' : 'candidate'
+        setCurrentUser(profile)
+        setCurrentRole(dashboard)
+        showToast('success', 'Signed in', `Verified by the server as ${session.role}.`)
+        resetForm()
+        setMagicLinkRequest(null)
+        setMode(dashboard)
+      } catch (error) {
+        setAuthNotice(error.message)
+        showToast('error', 'Sign-in failed', error.message)
+      } finally {
+        setLoadingAction('')
+      }
+      return
+    }
+
+    // Fallback (signup mock / no server token): keep the local behavior.
     const knownProfile = accountProfiles.get(email)
     const fallbackName = magicLinkRequest.name || (existingAccounts.has(email) ? 'Candidate' : email.split('@')[0])
     const profile = knownProfile || {

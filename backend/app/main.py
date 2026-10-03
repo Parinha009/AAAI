@@ -21,9 +21,11 @@ API_PREFIX = "/api/v1"
 app = FastAPI(title=settings.app_name)
 
 # Allow the React dev server (Vite) to call the API from the browser.
+# allow_origin_regex covers any localhost port, since Vite may pick 5173/5174/…
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1):\d+",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

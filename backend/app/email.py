@@ -39,9 +39,19 @@ def _bodies(link: str) -> tuple[str, str]:
     return text, html
 
 
+# Reserved / demo TLDs that can never receive mail (RFC 2606/6761). Sending to
+# them only produces bounce messages, so log the link instead.
+_UNDELIVERABLE_TLDS = (".local", ".test", ".invalid", ".example", ".localhost")
+
+
+def _is_undeliverable(email: str) -> bool:
+    domain = email.rsplit("@", 1)[-1].lower()
+    return domain.endswith(_UNDELIVERABLE_TLDS)
+
+
 def send_magic_link(to_email: str, link: str) -> None:
-    """Send (or, in dev, log) the passwordless sign-in link."""
-    if not settings.email_enabled:
+    """Send (or, in dev / for demo addresses, log) the passwordless sign-in link."""
+    if not settings.email_enabled or _is_undeliverable(to_email):
         logger.info("[DEV EMAIL] magic-link for %s -> %s", to_email, link)
         return
 

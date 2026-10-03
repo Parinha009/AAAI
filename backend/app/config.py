@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     smtp_use_tls: bool = True  # STARTTLS (port 587); set False for a plain local server
     smtp_use_ssl: bool = False  # implicit SSL (port 465)
 
+    # Optional: a real inbox for demo logins (kept in .env, never committed).
+    # The seed provisions it as a recruiter and "<name>+candidate@..." as a candidate.
+    seed_real_email: str = ""
+
     # CORS — origins allowed to call the API (the Vite dev server).
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 

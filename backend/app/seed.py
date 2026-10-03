@@ -7,6 +7,7 @@ Prints the demo JOB_ID plus the candidate/recruiter emails to request links for.
 
 from datetime import datetime, timezone
 
+from app.config import settings
 from app.database import SessionLocal
 from app.models import AuditLog, Candidate, Job, Recruiter, Response, Score
 
@@ -70,9 +71,29 @@ def main() -> None:
             print("Demo recruiter already exists.")
         print(f"RECRUITER_EMAIL: {recruiter.email}")
 
+        _seed_real_inbox(db, job)
         _seed_scored_candidates(db, job)
     finally:
         db.close()
+
+
+def _seed_real_inbox(db, job) -> None:
+    """If SEED_REAL_EMAIL is set in .env, provision it so magic links reach a real
+    inbox: the address itself as a recruiter, and its "+candidate" alias as a
+    candidate (Gmail delivers +aliases to the same inbox)."""
+    email = settings.seed_real_email.strip().lower()
+    if not email or "@" not in email:
+        return
+    local, domain = email.split("@", 1)
+    cand_email = f"{local}+candidate@{domain}"
+
+    if db.query(Recruiter).filter(Recruiter.email == email).first() is None:
+        db.add(Recruiter(email=email, name="Recruiter (real inbox)"))
+    if db.query(Candidate).filter(Candidate.email == cand_email, Candidate.job_id == job.job_id).first() is None:
+        db.add(Candidate(job_id=job.job_id, email=cand_email, name="Candidate (real inbox)", status="invited"))
+    db.commit()
+    print(f"REAL_RECRUITER_EMAIL: {email}")
+    print(f"REAL_CANDIDATE_EMAIL: {cand_email}")
 
 
 def _seed_scored_candidates(db, job) -> None:

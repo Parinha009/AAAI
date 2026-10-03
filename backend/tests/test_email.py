@@ -24,13 +24,23 @@ def test_smtp_send_builds_and_sends(monkeypatch):
 
     with patch("app.email.smtplib.SMTP") as smtp_cls:
         server = smtp_cls.return_value.__enter__.return_value
-        email_mod.send_magic_link("cand@demo.local", "http://localhost/auth?token=ABC123")
+        email_mod.send_magic_link("cand@mailbox.org", "http://localhost/auth?token=ABC123")
 
         server.send_message.assert_called_once()
         msg = server.send_message.call_args[0][0]
-        assert msg["To"] == "cand@demo.local"
+        assert msg["To"] == "cand@mailbox.org"
         assert msg["Subject"] == "Your AAAI sign-in link"
         assert "ABC123" in msg.as_string()  # the magic link is in the email
+
+
+def test_demo_domains_are_never_emailed(monkeypatch):
+    # .local / .test addresses can't receive mail — log instead of bouncing.
+    monkeypatch.setattr(settings, "email_enabled", True)
+    monkeypatch.setattr(settings, "smtp_host", "smtp.test")
+    with patch("app.email.smtplib.SMTP") as smtp:
+        email_mod.send_magic_link("candidate@demo.local", "http://link")
+        email_mod.send_magic_link("someone@site.test", "http://link")
+        smtp.assert_not_called()
 
 
 def test_enabled_without_host_raises(monkeypatch):

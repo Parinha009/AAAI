@@ -60,6 +60,14 @@ function formatAggregate(candidate) {
   return `${candidate.aggregateScore} / ${candidate.maxScore}`
 }
 
+// e.g. "Oct 6, 2026, 7:35 PM" in the viewer's own time zone.
+function formatDateTime(value) {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime())
+    ? ''
+    : date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+}
+
 function getScorePercent(candidate) {
   return Math.round((candidate.aggregateScore / candidate.maxScore) * 100)
 }
@@ -172,7 +180,10 @@ function mapLiveCandidate(c, jobTitle) {
     completedAt: c.response_count
       ? `${c.response_count} answer${c.response_count === 1 ? '' : 's'} recorded`
       : 'No answers yet',
+    invitedAt: c.invited_at,
+    lastAnswerAt: c.last_answer_at,
     responseCount: c.response_count,
+    rawStatus: c.status,
     auditEvents: [],
     traits: scored && c.scores
       ? TRAIT_LABELS.map(([key, label]) => ({ label, score: c.scores[key], rationale: '' }))
@@ -420,7 +431,7 @@ function CandidateLeaderboardSection({
           <span role="columnheader">Aggregate</span>
           <span role="columnheader">Tab switches</span>
           <span role="columnheader">Manual review</span>
-          <span role="columnheader">Completed</span>
+          <span role="columnheader">Date &amp; time</span>
           <span role="columnheader">Action</span>
         </div>
         {rankedCandidates.map((candidate, index) => (
@@ -442,7 +453,22 @@ function CandidateLeaderboardSection({
               <Icon name={candidate.review ? 'flag' : 'check'} size={15} />
               {candidate.status}
             </span>
-            <span className="completed-cell" role="cell">{candidate.completedAt}</span>
+            <span className="completed-cell" role="cell">
+              {candidate.lastAnswerAt ? (
+                <>
+                  <strong>{formatDateTime(candidate.lastAnswerAt)}</strong>
+                  <small>
+                    {candidate.responseCount} answer{candidate.responseCount === 1 ? '' : 's'}
+                    {candidate.rawStatus === 'completed' ? '' : ' - in progress'}
+                  </small>
+                </>
+              ) : candidate.invitedAt ? (
+                <>
+                  <strong>{formatDateTime(candidate.invitedAt)}</strong>
+                  <small>Invited - no answers yet</small>
+                </>
+              ) : candidate.completedAt}
+            </span>
             <button type="button" className="company-secondary-button compact" onClick={() => onReviewCandidate(candidate)}>
               Review
             </button>

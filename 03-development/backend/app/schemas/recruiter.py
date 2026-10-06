@@ -126,6 +126,8 @@ class JobCandidate(BaseModel):
     decision: str | None = None
     decided_at: datetime | None = None
     decided_by: str | None = None
+    invited_at: datetime | None = None  # when the interview was created (invite sent)
+    last_answer_at: datetime | None = None  # time of the latest recorded answer
 
 
 class JobCandidatesResponse(BaseModel):

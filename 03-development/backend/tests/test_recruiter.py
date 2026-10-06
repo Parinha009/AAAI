@@ -211,3 +211,20 @@ def test_recruiter_decision_and_invited_by(client, job_id, recruiter_headers, ca
                       json={"decision": "shortlisted"}).status_code == 403
     assert client.put(f"{API}/candidates/999999/decision", headers=recruiter_headers,
                       json={"decision": "shortlisted"}).status_code == 404
+
+
+def test_candidate_list_has_dates(client, recruiter_headers, candidate_headers, new_candidate):
+    """The leaderboard shows when each candidate was invited and last answered."""
+    from tests.conftest import consent
+
+    job_id, cid = new_candidate["job_id"], new_candidate["candidate_id"]
+    row = lambda: next(c for c in client.get(f"{API}/jobs/{job_id}/candidates", headers=recruiter_headers)
+                       .json()["candidates"] if c["candidate_id"] == cid)
+    assert row()["invited_at"] and row()["last_answer_at"] is None
+
+    consent(client, candidate_headers)
+    q = client.get(f"{API}/interview/questions", headers=candidate_headers).json()["questions"][0]
+    client.post(f"{API}/interview/responses", headers=candidate_headers,
+                files={"audio": ("a.webm", b"\0" * 2048, "audio/webm")},
+                data={"question_id": str(q["question_id"]), "type": "base"})
+    assert row()["last_answer_at"] >= row()["invited_at"]

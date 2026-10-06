@@ -330,16 +330,18 @@ def job_candidates(job_id: int, db: Session = Depends(get_db)) -> JobCandidatesR
         score = db.execute(select(Score).where(Score.candidate_id == cand.candidate_id)).scalar_one_or_none()
         toc = _tab_out_count(db, cand.candidate_id)
         reasons = _review_reasons(score, toc, pipeline.scoring_failed(db, cand.candidate_id))
-        count = db.scalar(
-            select(func.count()).select_from(Response).where(Response.candidate_id == cand.candidate_id)
-        ) or 0
+        count, last_answer_at = db.execute(
+            select(func.count(), func.max(Response.created_at)).where(Response.candidate_id == cand.candidate_id)
+        ).one()
         items.append(
             JobCandidate(
                 candidate_id=cand.candidate_id,
                 name=cand.name,
                 email=cand.email,
                 status=cand.status,
-                response_count=count,
+                response_count=count or 0,
+                invited_at=cand.created_at,
+                last_answer_at=last_answer_at,
                 aggregate_score=_aggregate(score) if score else None,
                 scores=TraitScores(
                     technical_skill=score.technical_skill,

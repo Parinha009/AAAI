@@ -7366,3 +7366,19 @@ img {
   margin: 0;
   color: var(--muted);
 }
+
+/* Leaderboard: date + time under "Completed" */
+.completed-cell strong {
+  display: block;
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.completed-cell small {
+  display: block;
+  color: var(--subtle);
+  font-size: 0.76rem;
+}
+
+.completed-cell strong { white-space: nowrap; }

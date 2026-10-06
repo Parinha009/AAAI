@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, String
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
@@ -35,6 +36,9 @@ class Candidate(TimestampMixin, Base):
     consent_version: Mapped[str | None] = mapped_column(String(20))
     consent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="invited")
+    # This interview's random draw from the job's question bank: ordered question_ids
+    # (FR-05). Null until the candidate first loads the questions.
+    assigned_questions: Mapped[list | None] = mapped_column(JSONB)
 
     job: Mapped[Job] = relationship(back_populates="candidates")
     responses: Mapped[list[Response]] = relationship(back_populates="candidate")

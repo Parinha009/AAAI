@@ -393,7 +393,7 @@ function CandidateLeaderboardSection({
           >
             {projects.map((item) => (
               <option value={item.jobId} key={item.jobId}>
-                {item.jobId} - {item.title}
+                {item.title} ({item.jobId})
               </option>
             ))}
           </select>
@@ -455,14 +455,16 @@ function CandidateLeaderboardSection({
   )
 }
 
-function ProjectOverviewSection({ project, rankedCandidates, needsReviewCount, onOpenCandidate }) {
+// Every hiring project (job) with its real counts. "Open" switches to that job's candidates.
+function ProjectOverviewSection({ projects, boards, selectedJobId, onOpenProject }) {
   return (
     <section className="project-table-card">
       <header className="project-overview-header">
         <div>
           <p className="eyebrow">Project overview</p>
-          <h2>Hiring project setup</h2>
+          <h2>Hiring projects</h2>
         </div>
+        <span>{projects.length} active</span>
       </header>
       <div className="project-table-head">
         <span>Hiring project</span>
@@ -473,37 +475,44 @@ function ProjectOverviewSection({ project, rankedCandidates, needsReviewCount, o
         <span>Action</span>
       </div>
 
-      <article className="project-row">
-        <div>
-          <h2>{project.name}</h2>
-          <p>Job_ID: {project.jobId}</p>
-          <p>Job Post: <span className="online-dot" /> {project.jobPost}</p>
-        </div>
-        <div>
-          <span className="status-chip success"><span className="online-dot" /> Active</span>
-        </div>
-        <div className="candidate-count">
-          <strong>{project.candidates}</strong>
-          <span className="new-chip">{Math.max(project.candidates - rankedCandidates.length, 0)} Pending</span>
-        </div>
-        <div className="assessment-list-compact">
-          {project.assessments.map((item) => (
-            <p key={item}><Icon name="play" size={15} /> {item}</p>
-          ))}
-        </div>
-        <div className="candidate-count">
-          <strong>{rankedCandidates.length}</strong>
-          <span className="new-chip">{needsReviewCount} Review</span>
-        </div>
-        <button
-          type="button"
-          className="company-secondary-button compact row-open-button"
-          onClick={() => onOpenCandidate(rankedCandidates[0])}
-          disabled={!rankedCandidates.length}
-        >
-          Open
-        </button>
-      </article>
+      {projects.map((item) => {
+        const list = boards[item.jobId] || []
+        const scored = list.filter((candidate) => candidate.scored).length
+        const review = list.filter((candidate) => candidate.review).length
+        return (
+          <article className={item.jobId === selectedJobId ? 'project-row selected' : 'project-row'} key={item.jobId}>
+            <div>
+              <h2>{item.name}</h2>
+              <p>Job_ID: {item.jobId}</p>
+              <p>Job Post: <span className="online-dot" /> {item.jobPost}</p>
+            </div>
+            <div>
+              <span className="status-chip success"><span className="online-dot" /> Active</span>
+            </div>
+            <div className="candidate-count">
+              <strong>{list.length}</strong>
+              <span className="new-chip">{list.length - scored} Awaiting AI</span>
+            </div>
+            <div className="assessment-list-compact">
+              {item.assessments.map((assessment) => (
+                <p key={assessment}><Icon name="play" size={15} /> {assessment}</p>
+              ))}
+              <small>Random questions per interview</small>
+            </div>
+            <div className="candidate-count">
+              <strong>{scored}</strong>
+              <span className="new-chip">{review} Review</span>
+            </div>
+            <button
+              type="button"
+              className="company-secondary-button compact row-open-button"
+              onClick={() => onOpenProject(item.jobId)}
+            >
+              Open
+            </button>
+          </article>
+        )
+      })}
     </section>
   )
 }
@@ -877,10 +886,13 @@ export default function CompanyDashboard({ user, onBackToLanding, onOpenLogin, o
             </section>
 
             <ProjectOverviewSection
-              project={project}
-              rankedCandidates={rankedCandidates}
-              needsReviewCount={needsReviewCount}
-              onOpenCandidate={handleReviewCandidate}
+              projects={liveProjects}
+              boards={liveLeaderboards}
+              selectedJobId={project.jobId}
+              onOpenProject={(jobId) => {
+                handleJobChange(jobId)
+                openInterviewPage('candidates')
+              }}
             />
           </>
         ) : null}
@@ -989,6 +1001,16 @@ export default function CompanyDashboard({ user, onBackToLanding, onOpenLogin, o
 
           {signedIn ? (
             <div className="company-workspace-actions">
+              {liveProjects.length > 1 && project ? (
+                <label className="company-job-select" htmlFor="headerJob">
+                  <span>Hiring project</span>
+                  <select id="headerJob" value={project.jobId} onChange={(event) => handleJobChange(event.target.value)}>
+                    {liveProjects.map((item) => (
+                      <option value={item.jobId} key={item.jobId}>{item.title}</option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
               <label className="company-search" htmlFor="companySearch">
                 <Icon name="search" />
                 <input

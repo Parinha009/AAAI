@@ -11,9 +11,12 @@ these are tunable *values*, not frozen shapes: editing wording here is not a
 contract change.
 """
 
+import copy
+
 from app.config import settings
 from app.database import SessionLocal
 from app.models import Candidate, Job, Recruiter
+from app.seed_jobs import BACKEND_EXTRA_QUESTIONS, ROLE_JOBS
 
 DEMO_TITLE = "Junior Backend Engineer"
 # Title used by the pre-rubric seed; looked up so an existing row is upgraded in
@@ -153,12 +156,48 @@ DEMO_RUBRIC = {
 }
 
 
+QUESTIONS_PER_INTERVIEW = 4  # drawn at random per interview from each job's bank (FR-05)
+
+
+def _backend_rubric() -> dict:
+    return {**DEMO_RUBRIC, "questions_per_interview": QUESTIONS_PER_INTERVIEW}
+
+
+def _role_rubric(role: dict) -> dict:
+    """The Lead's rubric with role-specific technical-skill and job-fit anchors.
+    Communication, problem solving, grading rules and the FR-10 cap are unchanged."""
+    rubric = copy.deepcopy(DEMO_RUBRIC)
+    rubric["role"] = role["title"]
+    rubric["traits"]["technical_skill"] = role["technical_skill"]
+    rubric["traits"]["job_fit"] = role["job_fit"]
+    rubric["questions_per_interview"] = QUESTIONS_PER_INTERVIEW
+    return rubric
+
+
+def _seed_role_jobs(db) -> None:
+    """The other hiring projects. Re-running the seed refreshes their banks in place."""
+    for role in ROLE_JOBS:
+        job = db.query(Job).filter(Job.title == role["title"]).first()
+        if job is None:
+            job = Job(title=role["title"], rubric_config=_role_rubric(role), base_questions=role["questions"])
+            db.add(job)
+            verb = "Created"
+        else:
+            job.rubric_config = _role_rubric(role)
+            job.base_questions = role["questions"]
+            verb = "Refreshed"
+        db.commit()
+        db.refresh(job)
+        print(f"{verb} job {job.job_id}: {job.title} ({len(job.base_questions)} questions in the bank)")
+
+
 def main() -> None:
     db = SessionLocal()
     try:
+        backend_bank = DEMO_QUESTIONS + BACKEND_EXTRA_QUESTIONS
         job = db.query(Job).filter(Job.title.in_((DEMO_TITLE, *LEGACY_TITLES))).first()
         if job is None:
-            job = Job(title=DEMO_TITLE, rubric_config=DEMO_RUBRIC, base_questions=DEMO_QUESTIONS)
+            job = Job(title=DEMO_TITLE, rubric_config=_backend_rubric(), base_questions=backend_bank)
             db.add(job)
             db.commit()
             db.refresh(job)
@@ -167,20 +206,23 @@ def main() -> None:
             # Re-apply the Lead-authored rubric/questions so re-running the seed
             # upgrades an existing row instead of leaving stale placeholders.
             job.title = DEMO_TITLE
-            job.rubric_config = DEMO_RUBRIC
-            job.base_questions = DEMO_QUESTIONS
+            job.rubric_config = _backend_rubric()
+            job.base_questions = backend_bank
             db.commit()
             db.refresh(job)
             print("Demo job already exists — rubric and questions refreshed.")
         print(f"JOB_ID: {job.job_id}")
         print(f"JOB_TITLE: {job.title}")
-        print(f"QUESTIONS: {len(job.base_questions)}  RUBRIC_TRAITS: {len(job.rubric_config['traits'])}")
+        print(f"QUESTIONS: {len(job.base_questions)} in the bank, {QUESTIONS_PER_INTERVIEW} drawn per interview  "
+              f"RUBRIC_TRAITS: {len(job.rubric_config['traits'])}")
 
         # Real data only: with SEED_REAL_EMAIL set (in .env), only that real inbox is
         # provisioned. The reserved-domain demo accounts are a fallback for teammates
         # who have no real inbox configured; no fake scored candidates are ever seeded.
         if not _seed_real_inbox(db, job):
             _seed_demo_accounts(db, job)
+
+        _seed_role_jobs(db)
     finally:
         db.close()
 

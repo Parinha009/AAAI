@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app import pipeline
+from app.questions import assigned_questions
 from app.config import settings
 from app.database import get_db
 from app.errors import api_error
@@ -90,17 +91,13 @@ def questions(
     candidate: Candidate = Depends(require_consent),
     db: Session = Depends(get_db),
 ) -> QuestionsResponse:
-    job = db.get(Job, candidate.job_id)
-    # Stored questions may be plain strings (early seed) or objects carrying an
-    # extra `trait` hint for the scorer. Either way we emit only the three fields
-    # the contract freezes: question_id, order, text.
+    # This interview's own random draw from the job's question bank (saved on first
+    # call, so a refresh shows the same questions). We emit only the three fields the
+    # contract freezes: question_id (stable id in the bank), order, text.
     items = [
-        Question(question_id=q.get("question_id", i + 1), order=q.get("order", i + 1), text=q["text"])
-        if isinstance(q, dict)
-        else Question(question_id=i + 1, order=i + 1, text=q)
-        for i, q in enumerate(job.base_questions or [])
+        Question(question_id=q["question_id"], order=i + 1, text=q["text"])
+        for i, q in enumerate(assigned_questions(db, candidate))
     ]
-    items.sort(key=lambda q: q.order)
     if candidate.status == "consented":
         candidate.status = "in_progress"
         db.commit()
@@ -130,6 +127,11 @@ def upload_response(
 
     if type not in ("base", "follow_up"):
         raise api_error(422, "VALIDATION_ERROR", "type must be 'base' or 'follow_up'")
+    if type == "follow_up":
+        question_id = 0  # contract: the follow-up is always question 0
+    elif question_id not in {q["question_id"] for q in assigned_questions(db, candidate)}:
+        raise api_error(422, "VALIDATION_ERROR", "That question is not part of this interview",
+                        {"field": "question_id"})
 
     ext = Path(audio.filename or "").suffix.lower()
     if ext not in _ALLOWED_EXT or (audio.content_type or "") not in _ALLOWED_MIME:

@@ -67,7 +67,7 @@ docker compose up -d db
 pytest
 ```
 
-37 tests cover: auth (magic-link, verify, single-use, anti-enumeration), the consent
+44 tests cover: auth (magic-link, verify, single-use, anti-enumeration), the consent
 gate (403 → 201 → 200), audio upload validation (201 / 413 / 415), tab-out logging +
 audit-log immutability, RBAC on `budget-status`, the budget kill-switch guard, the
 recruiter dashboard (jobs, ranked leaderboard, candidate detail, audio playback), and
@@ -83,6 +83,16 @@ envelope `{ "error": { "code", "message", "details" } }`. Seed demo data first:
 ```bash
 python -m app.seed   # the Lead's job + rubric, plus logins (see below)
 ```
+
+**Hiring projects + random questions (FR-05):** the seed creates 6 jobs — the Lead's
+*Junior Backend Engineer*, plus *Senior Frontend*, *Full-Stack*, *QA*, *DevOps* and *Data
+Analyst* ([app/seed_jobs.py](app/seed_jobs.py)). Each has a **bank of 12 questions** (3 per
+trait). Every interview draws **4 at random — one per trait — in random order**
+([app/questions.py](app/questions.py)), avoids questions that email already answered, and
+saves the draw in `candidates.assigned_questions` (migration `0003`) so a refresh shows the
+same set. `GET /interview/questions` keeps its contract shape; uploads for a question the
+interview wasn't asked are rejected (422). Non-backend rubrics reuse the Lead's anchors for
+communication / problem solving and the FR-10 cap; technical skill and job fit are per role.
 
 The seed creates **real data only**: the Lead-authored job/rubric/questions, plus
 `SEED_REAL_EMAIL` (from `.env`) as recruiter and its `+candidate` alias as candidate. If

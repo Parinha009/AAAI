@@ -25,13 +25,10 @@ def _upload(client, h, question_id, kind="base", audio=AUDIO):
 
 
 def _base_round(client, h, job_id):
+    """Answer this interview's own (randomly drawn) questions."""
     consent(client, h)
-    db = SessionLocal()
-    try:
-        n = len(db.get(Job, job_id).base_questions)
-    finally:
-        db.close()
-    return [_upload(client, h, q) for q in range(1, n + 1)]
+    qs = client.get(f"{API}/interview/questions", headers=h).json()["questions"]
+    return [_upload(client, h, q["question_id"]) for q in qs]
 
 
 def _follow_up(client, h):

@@ -6564,3 +6564,25 @@ img {
 .mic-meter span.heard {
   background: #2e9d5b;
 }
+
+/* Several hiring projects: header switcher + highlighted row */
+.company-job-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #5b6b7c;
+}
+
+.company-job-select select {
+  padding: 8px 10px;
+  border: 1px solid #cfd8e3;
+  border-radius: 10px;
+  background: #fff;
+  font: inherit;
+  color: #15233b;
+}
+
+.project-row.selected {
+  box-shadow: inset 4px 0 0 #2f5bea;
+}

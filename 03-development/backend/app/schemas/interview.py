@@ -43,6 +43,13 @@ class ResponseStatus(BaseModel):
     no_speech_flag: bool = False
 
 
+# --- Follow-up question (FR-08) -------------------------------------------
+class FollowUpQuestion(BaseModel):
+    question_id: int = 0  # 0 = the follow-up
+    text: str
+    follow_up_seconds: int
+
+
 # --- Tab-out (FR-12) ------------------------------------------------------
 class TabOutRequest(BaseModel):
     question_id: int

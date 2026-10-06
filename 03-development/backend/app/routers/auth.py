@@ -1,16 +1,14 @@
 """Auth routes (API Contract v1 §3.2) — passwordless magic-link (FR-04)."""
 
-import hashlib
-import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
-from app.email import send_magic_link
 from app.errors import api_error
+from app.magic_links import hash_token, issue_magic_link
 from app.models import Candidate, MagicLinkToken, Recruiter
 from app.schemas.auth import (
     MagicLinkRequest,
@@ -23,10 +21,6 @@ from app.schemas.auth import (
 from app.security import create_session_token, get_session, session_expires_at
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-
-
-def _hash(raw: str) -> str:
-    return hashlib.sha256(raw.encode()).hexdigest()
 
 
 @router.post(
@@ -47,20 +41,12 @@ def magic_link(payload: MagicLinkRequest, db: Session = Depends(get_db)) -> Magi
 
     subject = recruiter or candidate
     if subject is not None:
-        raw = secrets.token_urlsafe(32)
-        token = MagicLinkToken(
-            token_hash=_hash(raw),
+        raw, link = issue_magic_link(
+            db,
             email=payload.email,
             role="recruiter" if recruiter else "candidate",
             job_id=candidate.job_id if candidate else None,
-            expires_at=datetime.now(timezone.utc)
-            + timedelta(seconds=settings.magic_link_ttl_seconds),
         )
-        db.add(token)
-        db.commit()
-
-        link = f"{settings.frontend_base_url}/auth/callback?token={raw}"
-        send_magic_link(payload.email, link)
         if settings.environment == "development":
             resp.dev_magic_link = link
             resp.dev_token = raw
@@ -76,7 +62,7 @@ def magic_link(payload: MagicLinkRequest, db: Session = Depends(get_db)) -> Magi
 )
 def verify(payload: VerifyRequest, db: Session = Depends(get_db)) -> VerifyResponse:
     token = (
-        db.query(MagicLinkToken).filter(MagicLinkToken.token_hash == _hash(payload.token)).first()
+        db.query(MagicLinkToken).filter(MagicLinkToken.token_hash == hash_token(payload.token)).first()
     )
     if token is None or token.consumed_at is not None or token.expires_at < datetime.now(timezone.utc):
         # One 401 for invalid / used / expired — don't leak which (FR-04).

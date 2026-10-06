@@ -1,7 +1,8 @@
 """Interview flow routes (API Contract v1 §3.3).
 
 consent (FR-01), base questions (FR-05), audio upload (FR-02/06), transcription
-poll (FR-07/17), tab-out (FR-12), screen-flow status (FR-17).
+poll (FR-07/17), follow-up (FR-08), tab-out (FR-12), screen-flow status (FR-17).
+The AI work itself runs in background tasks - see app/pipeline.py.
 """
 
 import logging
@@ -10,8 +11,10 @@ from pathlib import Path
 from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Request, UploadFile, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
+from app import pipeline
 from app.config import settings
 from app.database import get_db
 from app.errors import api_error
@@ -19,6 +22,7 @@ from app.models import AuditLog, Candidate, Job, Response
 from app.schemas.interview import (
     ConsentRequest,
     ConsentResponse,
+    FollowUpQuestion,
     InterviewStatusResponse,
     Question,
     QuestionsResponse,
@@ -41,8 +45,9 @@ _ALLOWED_MIME = {
 
 
 def enqueue_transcription(response_id: int) -> None:
-    """STUB for FR-07 (Whisper). Real impl fills transcript / sets status."""
-    logger.info("Enqueued response %s for transcription (stub)", response_id)
+    """Background task: Whisper transcription (FR-07), then advance the pipeline."""
+    logger.info("Transcribing response %s", response_id)
+    pipeline.transcribe_response(response_id)
 
 
 # --- Consent (FR-01) ------------------------------------------------------
@@ -202,6 +207,27 @@ def response_status(
     )
 
 
+# --- Follow-up question (FR-08) — 202 while generating, 200 when ready -----
+@router.get(
+    "/follow-up",
+    response_model=FollowUpQuestion,
+    responses={202: {"description": "Still generating - poll again"}},
+    summary="Get the one AI follow-up question (FR-08)",
+)
+def follow_up(
+    background_tasks: BackgroundTasks,
+    candidate: Candidate = Depends(require_consent),
+    db: Session = Depends(get_db),
+):
+    question = pipeline.follow_up_question(db, candidate.candidate_id)
+    if question:
+        return FollowUpQuestion(text=question, follow_up_seconds=settings.follow_up_seconds)
+    # Generate only once every base answer is transcribed; until then keep polling.
+    if not pipeline.base_pending(db, candidate.candidate_id):
+        background_tasks.add_task(pipeline.generate_follow_up, candidate.candidate_id)
+    return JSONResponse(status_code=status.HTTP_202_ACCEPTED, content={"status": "generating"})
+
+
 # --- Tab-out (FR-12) — fire-and-forget, must not block recording ---------
 @router.post(
     "/events/tab-out",
@@ -231,14 +257,24 @@ def tab_out(
 
 # --- Screen-flow driver (FR-17) ------------------------------------------
 @router.get("/status", response_model=InterviewStatusResponse, summary="What screen should the UI show? (FR-17)")
-def interview_status(candidate: Candidate = Depends(get_current_candidate)) -> InterviewStatusResponse:
-    # Minimal mapping from candidate.status → UI stage/next_action.
-    mapping = {
-        "invited": ("consent", "show_consent"),
-        "consented": ("base", "answer_base"),
-        "in_progress": ("base", "answer_base"),
-        "completed": ("completed", "show_complete"),
-        "expired": ("completed", "show_complete"),
-    }
-    stage, next_action = mapping.get(candidate.status, ("consent", "show_consent"))
-    return InterviewStatusResponse(candidate_status=candidate.status, stage=stage, next_action=next_action)
+def interview_status(
+    candidate: Candidate = Depends(get_current_candidate),
+    db: Session = Depends(get_db),
+) -> InterviewStatusResponse:
+    def out(stage: str, next_action: str) -> InterviewStatusResponse:
+        return InterviewStatusResponse(candidate_status=candidate.status, stage=stage, next_action=next_action)
+
+    if candidate.status == "invited":
+        return out("consent", "show_consent")
+    if candidate.status in ("completed", "expired"):
+        return out("completed", "show_complete")
+    answered_follow_up = (
+        db.query(Response)
+        .filter(Response.candidate_id == candidate.candidate_id, Response.type == "follow_up")
+        .first()
+    )
+    if answered_follow_up is not None:
+        return out("scoring", "await_score")
+    if pipeline.follow_up_question(db, candidate.candidate_id):
+        return out("follow_up", "answer_follow_up")
+    return out("base", "answer_base")

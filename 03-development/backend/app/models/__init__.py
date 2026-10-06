@@ -2,6 +2,7 @@
 
 from app.models.audit_log import AuditLog
 from app.models.base import Base
+from app.models.budget import BudgetUsage
 from app.models.candidate import Candidate
 from app.models.job import Job
 from app.models.magic_link import MagicLinkToken
@@ -18,4 +19,5 @@ __all__ = [
     "AuditLog",
     "Recruiter",
     "MagicLinkToken",
+    "BudgetUsage",
 ]

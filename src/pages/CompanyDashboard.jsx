@@ -654,7 +654,6 @@ function InviteCandidatePanel() {
       setResult({
         type: 'success',
         text: `Invite sent to ${res.email}. They'll receive a one-time sign-in link by email.`,
-        link: res.dev_magic_link,
       })
       setEmail('')
       setName('')
@@ -704,11 +703,6 @@ function InviteCandidatePanel() {
       {result ? (
         <p className={`invite-note ${result.type}`} role="status">
           {result.text}
-          {result.link ? (
-            <>
-              {' '}<a href={result.link}>Open sign-in link</a> (dev only — signs this browser in as the candidate)
-            </>
-          ) : null}
         </p>
       ) : null}
     </section>

@@ -37,3 +37,14 @@ def test_verify_is_single_use(client, new_candidate):
 
 def test_verify_bad_token(client):
     assert client.post(f"{API}/auth/verify", json={"token": "garbage"}).status_code == 401
+
+
+def test_sign_in_token_never_returned_by_default(client, recruiter_email, monkeypatch):
+    """Security (FR-04 / NFR-04): the API must not hand out the sign-in token -
+    otherwise anyone could log in as any registered email without the inbox."""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "expose_dev_tokens", False)
+    r = client.post(f"{API}/auth/magic-link", json={"email": recruiter_email})
+    assert r.status_code == 202
+    assert "dev_token" not in r.json() and "dev_magic_link" not in r.json()

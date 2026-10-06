@@ -27,6 +27,7 @@ _admin.dispose()
 settings.database_url = _test_url.render_as_string(hide_password=False)
 settings.media_dir = tempfile.mkdtemp(prefix="aaai-test-media-")
 settings.ai_provider = "fake"  # tests never call OpenAI or spend budget, even with a key in .env
+settings.expose_dev_tokens = True  # tests read the sign-in token from the response (never on a real server)
 command.upgrade(Config(str(Path(__file__).resolve().parents[1] / "alembic.ini")), "head")
 
 import pytest  # noqa: E402

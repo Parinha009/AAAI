@@ -4,6 +4,7 @@ All routes are mounted under /api/v1 per API Contract v1. A standard error
 envelope wraps every non-2xx response.
 """
 
+import logging
 from datetime import datetime, timezone
 
 from fastapi import Depends, FastAPI
@@ -17,6 +18,15 @@ from app.errors import register_error_handlers
 from app.routers import auth, interview, recruiter, system
 
 API_PREFIX = "/api/v1"
+
+# Show the app's own INFO logs (AI pipeline progress, dev-email links for reserved
+# demo domains) in the server console. Uvicorn only configures its own loggers.
+_app_log = logging.getLogger("aaai")
+if not _app_log.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("%(levelname)s:     %(name)s - %(message)s"))
+    _app_log.addHandler(_handler)
+_app_log.setLevel(logging.INFO)
 
 app = FastAPI(title=settings.app_name)
 

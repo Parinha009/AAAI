@@ -118,11 +118,13 @@ python -m app.seed   # prints JOB_ID (int), CANDIDATE_EMAIL, RECRUITER_EMAIL
 under `media/<candidate_id>/`). Upload returns `status: "transcribing"`; the frontend
 polls `GET /responses/{id}` until final.
 
-**Magic-link flow (FR-04):** `POST /auth/magic-link` `{email}` → in dev the 202 response
-includes `dev_magic_link` / `dev_token` (link is logged, not emailed) → `POST /auth/verify`
-`{token}` → use `session_token` as `Authorization: Bearer`. Tokens are **single-use**,
-expire after 15 min, and sessions are **role-scoped** (candidate token → 403 on recruiter
-work and vice versa).
+**Magic-link flow (FR-04):** `POST /auth/magic-link` `{email}` → 202 (generic, never says
+whether the email exists) → the link is **emailed** → the user clicks it, the frontend calls
+`POST /auth/verify` `{token}` → use `session_token` as `Authorization: Bearer`. Tokens are
+**single-use**, expire after 15 min, and sessions are **role-scoped**. The token is **never**
+returned in the API response: `EXPOSE_DEV_TOKENS` (default `false`) exists only for the test
+suite. Demo addresses on reserved domains (`@demo.local`, `.test`…) are not emailed — their
+link is printed in the backend log instead, so only whoever runs the server can use it.
 
 **Real email (FR-04):** set `EMAIL_ENABLED=true` + the `SMTP_*` vars in `.env` (see
 `.env.example`) and the magic link is sent over SMTP via [app/email.py](app/email.py)

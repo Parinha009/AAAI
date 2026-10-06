@@ -151,14 +151,14 @@ export default function App() {
     setAuthNotice('')
 
     try {
-      // Real backend call (SRS-FR-04). In dev the response carries dev_token.
+      // SRS-FR-04: the server emails a one-time link; signing in happens only when
+      // that link is opened (/auth/callback?token=...). The token never reaches this page.
       const res = await requestMagicLink(email)
       setFormData((current) => ({ ...current, email }))
       setMagicLinkRequest({
         email,
         role: authRole,
         source: 'login',
-        devToken: res.dev_token || null,
       })
       setAuthNotice(res.message || 'If that email is registered, a sign-in link is on its way.')
       showToast('success', 'Magic link sent', `Check ${email} for your secure sign-in link.`)
@@ -210,7 +210,7 @@ export default function App() {
     }, 760)
   }
 
-  const handleResendMagicLink = () => {
+  const handleResendMagicLink = async () => {
     const email = magicLinkRequest?.email || normalizeEmail(formData.email)
 
     if (!email) {
@@ -220,72 +220,19 @@ export default function App() {
     }
 
     setLoadingAction('resendMagicLink')
-
-    window.setTimeout(() => {
+    try {
+      await requestMagicLink(email)
       showToast('success', 'Magic link resent', `Check ${email} for the newest sign-in link.`)
+    } catch (error) {
+      showToast('error', 'Could not resend link', error.message)
+    } finally {
       setLoadingAction('')
-    }, 520)
+    }
   }
 
   const handleChangeAuthEmail = () => {
     setMagicLinkRequest(null)
     setAuthNotice('')
-  }
-
-  const handleOpenMagicLink = async () => {
-    if (!magicLinkRequest) {
-      return
-    }
-
-    const email = magicLinkRequest.email
-
-    // Real backend verification when we have a server-issued token (dev flow).
-    if (magicLinkRequest.devToken) {
-      setLoadingAction('openMagicLink')
-      try {
-        const session = await verifyToken(magicLinkRequest.devToken)
-        const me = await getMe(session.session_token)
-        localStorage.setItem('aaai_session', session.session_token)
-
-        const profile = { name: magicLinkRequest.name || email.split('@')[0], email }
-        if (!existingAccounts.has(email)) existingAccounts.add(email)
-        accountProfiles.set(email, profile)
-
-        const dashboard = session.role === 'recruiter' ? 'company' : 'candidate'
-        setCurrentUser(profile)
-        setCurrentRole(dashboard)
-        showToast('success', 'Signed in', `Verified by the server as ${session.role}.`)
-        resetForm()
-        setMagicLinkRequest(null)
-        setMode(dashboard)
-      } catch (error) {
-        setAuthNotice(error.message)
-        showToast('error', 'Sign-in failed', error.message)
-      } finally {
-        setLoadingAction('')
-      }
-      return
-    }
-
-    // Fallback (signup mock / no server token): keep the local behavior.
-    const knownProfile = accountProfiles.get(email)
-    const fallbackName = magicLinkRequest.name || (existingAccounts.has(email) ? 'Candidate' : email.split('@')[0])
-    const profile = knownProfile || {
-      name: fallbackName,
-      email,
-    }
-
-    if (!existingAccounts.has(email)) {
-      existingAccounts.add(email)
-    }
-    accountProfiles.set(email, profile)
-
-    setCurrentUser(profile)
-    setCurrentRole(magicLinkRequest.role === 'company' ? 'company' : 'candidate')
-    showToast('success', 'Signed in', 'Your magic link was verified.')
-    resetForm()
-    setMagicLinkRequest(null)
-    setMode('landing')
   }
 
   const handleGoLanding = () => {
@@ -349,7 +296,6 @@ export default function App() {
           onChange={handleChange}
           onChangeEmail={handleChangeAuthEmail}
           onGoToLanding={handleGoLanding}
-          onOpenMagicLink={handleOpenMagicLink}
           onResendMagicLink={handleResendMagicLink}
           onSwitchToSignup={() => openSignup({ email: formData.email, role: authRole })}
           onSubmit={handleRequestMagicLink}
@@ -365,7 +311,6 @@ export default function App() {
           onChange={handleChange}
           onChangeEmail={handleChangeAuthEmail}
           onGoToLanding={handleGoLanding}
-          onOpenMagicLink={handleOpenMagicLink}
           onResendMagicLink={handleResendMagicLink}
           onSubmit={handleSignup}
           onSwitchToLogin={() => openLogin({ email: formData.email, role: authRole })}

@@ -11,8 +11,8 @@ async function parse(res) {
   return data
 }
 
-// Step 1 — ask the server to send a sign-in link. In dev the response includes
-// `dev_token` so we can complete the flow without a real inbox.
+// Step 1 — ask the server to email a one-time sign-in link (FR-04). The token is
+// never returned to the browser; signing in happens from the emailed link.
 export function requestMagicLink(email) {
   return fetch(`${API_BASE}/auth/magic-link`, {
     method: 'POST',

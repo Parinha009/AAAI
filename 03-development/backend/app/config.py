@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     magic_link_ttl_seconds: int = 900  # 15-minute link expiry
     frontend_base_url: str = "http://localhost:5173"  # link target the email points to
     email_enabled: bool = False  # False (dev): links are logged, not emailed
+    # SECURITY (FR-04 / NFR-04): when True, the API returns the raw sign-in token in
+    # its response (dev_token / dev_magic_link) - anyone could then sign in as any
+    # registered email without opening the inbox. Only the automated tests turn this
+    # on. Never enable it on a server real people can reach.
+    expose_dev_tokens: bool = False
 
     # SMTP (used only when email_enabled=True). Fill these from the provider.
     smtp_host: str = ""

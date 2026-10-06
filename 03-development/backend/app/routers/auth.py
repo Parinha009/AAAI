@@ -52,7 +52,7 @@ def magic_link(payload: MagicLinkRequest, db: Session = Depends(get_db)) -> Magi
             role="recruiter" if recruiter else "candidate",
             job_id=candidate.job_id if candidate else None,
         )
-        if settings.environment == "development":
+        if settings.expose_dev_tokens:  # tests only - see config.expose_dev_tokens
             resp.dev_magic_link = link
             resp.dev_token = raw
 

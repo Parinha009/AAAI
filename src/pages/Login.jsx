@@ -24,7 +24,6 @@ export default function Login({
   onChange,
   onChangeEmail,
   onGoToLanding,
-  onOpenMagicLink,
   onResendMagicLink,
   onSwitchToSignup,
   onSubmit,
@@ -58,20 +57,11 @@ export default function Login({
             <div>
               <strong>Sent to {magicLinkRequest.email}</strong>
               <p>
-                {roleLabels[selectedRole]} access is attached to this link.{' '}
-                Magic links expire after a short window and can only be used once. This demo includes a local
-                verification button in place of an email inbox.
+                If that email has access, a {roleLabels[selectedRole].toLowerCase()} sign-in link is on its way.
+                Open the email and click <strong>Sign in</strong>. The link works once and expires after 15 minutes.
               </p>
             </div>
           </section>
-
-          <button
-            type="button"
-            className="submit-button"
-            onClick={onOpenMagicLink}
-          >
-            Open demo magic link
-          </button>
 
           <div className="auth-link-actions">
             <button

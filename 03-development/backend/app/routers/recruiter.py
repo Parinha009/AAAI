@@ -257,7 +257,7 @@ def invite_candidate(job_id: int, payload: InviteRequest, db: Session = Depends(
         name=candidate.name,
         candidate_status=candidate.status,
     )
-    if settings.environment == "development":
+    if settings.expose_dev_tokens:  # tests only - see config.expose_dev_tokens
         resp.dev_magic_link = link
         resp.dev_token = raw
     return resp

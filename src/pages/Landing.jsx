@@ -90,9 +90,9 @@ const team = [
 ]
 
 // Decorative letter texture behind the footer wordmark.
-const FOOTER_TEXTURE = Array.from({ length: 26 }, (_, row) => {
+const FOOTER_TEXTURE = Array.from({ length: 34 }, (_, row) => {
   const words = ['AAAI', 'INTERVIEW', 'VOICE', 'SCORE', 'REVIEW', 'FAIR', 'ASYNC']
-  return Array.from({ length: 22 }, (_, col) => words[(row * 3 + col) % words.length]).join(' ')
+  return Array.from({ length: 60 }, (_, col) => words[(row * 3 + col) % words.length]).join(' ') // wide enough for 4K
 }).join('\n')
 
 const roleOptions = [

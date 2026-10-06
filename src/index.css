@@ -7182,10 +7182,10 @@ img {
   position: relative;
   z-index: 1;
   overflow: hidden;
-  width: min(1240px, calc(100% - 32px));
-  margin: 24px auto 24px;
-  padding: 48px clamp(24px, 4vw, 48px) 24px;
-  border-radius: 20px;
+  width: 100%;
+  margin: 24px 0 0;
+  padding: 56px max(24px, calc((100% - 1200px) / 2)) 28px;
+  border-radius: 28px 28px 0 0;
   color: #dfe8ff;
   background:
     radial-gradient(circle at 15% 0%, rgba(49, 94, 234, 0.45), transparent 45%),

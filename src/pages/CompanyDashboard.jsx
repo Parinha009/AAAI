@@ -93,6 +93,14 @@ function formatReviewReason(reason) {
   return words.charAt(0).toUpperCase() + words.slice(1)
 }
 
+const AUDIT_TYPE_LABELS = {
+  CONSENT: 'Consent',
+  TAB_OUT: 'Tab switch',
+  AI_REQUEST: 'AI request',
+  AI_RESPONSE: 'AI response',
+  BUDGET_FREEZE: 'Budget pause',
+}
+
 const AI_KIND_LABELS = { transcription: 'Transcription', follow_up: 'Follow-up', scoring: 'Scoring' }
 
 // One row of GET /candidates/{id}/audit -> a readable audit-trail entry (FR-13).
@@ -268,7 +276,7 @@ function InterviewPageTabs({ activePage, onChange }) {
 
 // Recruiter invites a candidate by email (SRS-FR-04: candidates are invited,
 // never self-registered). Uses the real jobs + invite endpoint on the backend.
-function InviteCandidatePanel({ onInvited }) {
+function InviteCandidatePanel({ onInvited, defaultJobId }) {
   const [jobs, setJobs] = useState([])
   const [jobId, setJobId] = useState('')
   const [email, setEmail] = useState('')
@@ -285,10 +293,15 @@ function InviteCandidatePanel({ onInvited }) {
       .then((data) => {
         const list = data.jobs || []
         setJobs(list)
-        if (list.length) setJobId(String(list[0].job_id))
+        if (list.length) setJobId(String(defaultJobId || list[0].job_id))
       })
       .catch((error) => setResult({ type: 'error', text: `Could not load jobs: ${error.message}` }))
   }, [connected])
+
+  // Invite into the hiring project the recruiter is looking at.
+  useEffect(() => {
+    if (defaultJobId) setJobId(String(defaultJobId))
+  }, [defaultJobId])
 
   const handleSubmit = async (event) => {
     event.preventDefault()
@@ -318,7 +331,6 @@ function InviteCandidatePanel({ onInvited }) {
   return (
     <section className="invite-panel" aria-label="Invite a candidate">
       <div>
-        <p className="eyebrow">SRS-FR-04</p>
         <h3>Invite a candidate</h3>
         <p>Candidates join by invitation: they get an email with a one-time sign-in link to start the interview.</p>
       </div>
@@ -341,7 +353,7 @@ function InviteCandidatePanel({ onInvited }) {
           />
           <select value={jobId} onChange={(event) => setJobId(event.target.value)} aria-label="Job">
             {jobs.map((job) => (
-              <option key={job.job_id} value={job.job_id}>{job.job_id} - {job.title}</option>
+              <option key={job.job_id} value={job.job_id}>{job.title}</option>
             ))}
           </select>
           <button type="submit" className="company-secondary-button compact" disabled={sending || !jobId}>
@@ -361,7 +373,7 @@ function InviteCandidatePanel({ onInvited }) {
 }
 
 function CandidateLeaderboardSection({
-  project, projects, rankedCandidates, selectedJobId, onJobChange, onReviewCandidate, onInvited,
+  project, rankedCandidates, onReviewCandidate, onInvited,
   searchQuery = '', totalCount = rankedCandidates.length, onClearSearch,
 }) {
   const query = searchQuery.trim()
@@ -369,35 +381,14 @@ function CandidateLeaderboardSection({
     <section className="recruiter-scoreboard">
       <header className="scoreboard-header">
         <div>
-          <p className="eyebrow">SRS-FR-14 / SRS-FR-15</p>
           <h2>Candidate leaderboard</h2>
-          <p>Score, TAB_OUT, review flag, transcript, and audio.</p>
-          <div className="scoreboard-summary-list" aria-label="Recruiter review capabilities">
-            <span><strong>Name</strong></span>
-            <span><strong>Score</strong></span>
-            <span><strong>TAB_OUT</strong></span>
-            <span><strong>Review</strong></span>
-          </div>
+          <p>Ranked by AI score. Open a candidate to read their answers, play the recordings and see any flags.</p>
         </div>
       </header>
 
-      <InviteCandidatePanel onInvited={onInvited} />
+      <InviteCandidatePanel onInvited={onInvited} defaultJobId={project.apiJobId} />
 
       <div className="leaderboard-toolbar">
-        <label htmlFor="jobFilter">
-          Job
-          <select
-            id="jobFilter"
-            value={selectedJobId}
-            onChange={(event) => onJobChange(event.target.value)}
-          >
-            {projects.map((item) => (
-              <option value={item.jobId} key={item.jobId}>
-                {item.title} ({item.jobId})
-              </option>
-            ))}
-          </select>
-        </label>
         {query ? (
           <span className="search-summary">
             <strong>{rankedCandidates.length}</strong> of {totalCount} match &ldquo;{query}&rdquo;
@@ -413,7 +404,7 @@ function CandidateLeaderboardSection({
           <span role="columnheader">Rank</span>
           <span role="columnheader">Candidate</span>
           <span role="columnheader">Aggregate</span>
-          <span role="columnheader">TAB_OUT</span>
+          <span role="columnheader">Tab switches</span>
           <span role="columnheader">Manual review</span>
           <span role="columnheader">Completed</span>
           <span role="columnheader">Action</span>
@@ -461,7 +452,6 @@ function ProjectOverviewSection({ projects, boards, selectedJobId, onOpenProject
     <section className="project-table-card">
       <header className="project-overview-header">
         <div>
-          <p className="eyebrow">Project overview</p>
           <h2>Hiring projects</h2>
         </div>
         <span>{projects.length} active</span>
@@ -483,8 +473,6 @@ function ProjectOverviewSection({ projects, boards, selectedJobId, onOpenProject
           <article className={item.jobId === selectedJobId ? 'project-row selected' : 'project-row'} key={item.jobId}>
             <div>
               <h2>{item.name}</h2>
-              <p>Job_ID: {item.jobId}</p>
-              <p>Job Post: <span className="online-dot" /> {item.jobPost}</p>
             </div>
             <div>
               <span className="status-chip success"><span className="online-dot" /> Active</span>
@@ -540,7 +528,6 @@ function CandidateDetailDrawer({ candidate, onClose }) {
         <header className="drawer-candidate-head">
           <span className="drawer-avatar">{candidate.name.charAt(0)}</span>
           <div>
-            <p className="eyebrow">SRS-FR-14 scorecard detail</p>
             <h2 id="candidate-detail-title">{candidate.name}</h2>
             <p>{candidate.role} - aggregate {formatAggregate(candidate)}</p>
           </div>
@@ -557,7 +544,7 @@ function CandidateDetailDrawer({ candidate, onClose }) {
           </article>
           <article className="drawer-summary-card">
             <strong>{candidate.tabOuts}</strong>
-            <span>TAB_OUT</span>
+            <span>Tab switches</span>
           </article>
           <article className="drawer-summary-card">
             <strong>{candidate.confidence}</strong>
@@ -636,7 +623,7 @@ function CandidateDetailDrawer({ candidate, onClose }) {
           ) : null}
           {candidate.auditEvents.map((event, index) => (
             <article className="audit-trail-row" key={`${candidate.id}-${event.logId ?? index}`}>
-              <span>{event.type}</span>
+              <span>{AUDIT_TYPE_LABELS[event.type] || event.type}</span>
               <div>
                 <strong>{event.time}</strong>
                 <p>{event.detail}</p>
@@ -855,7 +842,6 @@ export default function CompanyDashboard({ user, onBackToLanding, onOpenLogin, o
             <section className="recruiter-command-center" aria-label="Recruiter dashboard summary">
               <div className="budget-guard-card auth-session-card">
                 <div className="auth-session-copy">
-                  <p className="eyebrow">SRS-FR-04</p>
                   <h2>Signed-in recruiter session</h2>
                   <p>Verified by the server from your emailed sign-in link.</p>
                 </div>
@@ -880,7 +866,7 @@ export default function CompanyDashboard({ user, onBackToLanding, onOpenLogin, o
               <div className="recruiter-metrics-grid">
                 <RecruiterMetric label="Scorecards" value={scoredCount} detail="AI scored" icon="chart" />
                 <RecruiterMetric label="Review" value={needsReviewCount} detail="Flagged" icon="flag" tone="warning" />
-                <RecruiterMetric label="TAB_OUT" value={totalTabOuts} detail="Events" icon="shield" />
+                <RecruiterMetric label="Tab switches" value={totalTabOuts} detail="Logged" icon="shield" />
                 <RecruiterMetric label="Audio" value={totalAudioResponses} detail="Answers" icon="mic" />
               </div>
             </section>
@@ -900,10 +886,7 @@ export default function CompanyDashboard({ user, onBackToLanding, onOpenLogin, o
         {activeInterviewPage === 'candidates' ? (
           <CandidateLeaderboardSection
             project={project}
-            projects={liveProjects}
             rankedCandidates={searchedCandidates}
-            selectedJobId={project.jobId}
-            onJobChange={handleJobChange}
             onReviewCandidate={handleReviewCandidate}
             onInvited={refresh}
             searchQuery={searchQuery}
@@ -990,13 +973,8 @@ export default function CompanyDashboard({ user, onBackToLanding, onOpenLogin, o
       <section className="company-workspace">
         <div className="company-workspace-header">
           <div className="recruiter-title-block">
-            <p className="eyebrow">Company page</p>
-            <h1>
-              Recruiter Dashboard {project ? <CountBadge>{project.jobId}</CountBadge> : null}
-            </h1>
-            <p>
-              <strong>Magic-link access.</strong> Ranked scores, TAB_OUT flags, transcripts, and audio.
-            </p>
+            <h1>Recruiter Dashboard</h1>
+            <p>Review AI-scored interviews, recordings and flags for each hiring project.</p>
           </div>
 
           {signedIn ? (

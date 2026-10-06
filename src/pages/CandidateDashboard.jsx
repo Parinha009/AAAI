@@ -11,7 +11,7 @@ import {
 import Icon from '../components/Icon'
 import RoleMismatch from '../components/RoleMismatch'
 
-const BASE_ROUND_SECONDS = 300
+const DEFAULT_QUESTION_SECONDS = 120 // 2:00 per question; the server sends the real value
 const PROCESSING_DELAY_MS = 900
 
 const formatTime = (seconds) => {
@@ -97,7 +97,10 @@ function MicMeter({ level, small = false }) {
 function InterviewWorkspace({ candidateName, onClose }) {
   const [stage, setStage] = useState('consent')
   const [consentAccepted, setConsentAccepted] = useState(false)
-  const [baseSeconds, setBaseSeconds] = useState(BASE_ROUND_SECONDS)
+  // Each question has its own countdown. Time left is kept per question, so going
+  // Back resumes where that question's timer stopped instead of granting fresh time.
+  const [questionSeconds, setQuestionSeconds] = useState(DEFAULT_QUESTION_SECONDS)
+  const [timeLeft, setTimeLeft] = useState({})
   const [currentBaseIndex, setCurrentBaseIndex] = useState(0)
   const [isRecording, setIsRecording] = useState(false)
   const [responses, setResponses] = useState([])
@@ -130,7 +133,7 @@ function InterviewWorkspace({ candidateName, onClose }) {
   const uploadsRef = useRef([]) // in-flight uploads, awaited before submitting the interview
   const isTimedStage = stage === 'base'
   const activeQuestion = baseQuestions[currentBaseIndex]
-  const activeSeconds = baseSeconds
+  const activeSeconds = activeQuestion ? (timeLeft[activeQuestion.id] ?? questionSeconds) : 0
   const answeredCurrentQuestion = responses.some((response) => response.questionId === activeQuestion?.id)
 
   useEffect(() => {
@@ -160,23 +163,29 @@ function InterviewWorkspace({ candidateName, onClose }) {
     }
   }, [isTimedStage])
 
+  // Count down only the question on screen (paused during "Processing...").
   useEffect(() => {
-    if (stage !== 'base') {
+    const questionId = activeQuestion?.id
+    if (stage !== 'base' || questionId === undefined) {
       return undefined
     }
 
     const intervalId = window.setInterval(() => {
-      setBaseSeconds((current) => Math.max(current - 1, 0))
+      setTimeLeft((current) => ({
+        ...current,
+        [questionId]: Math.max((current[questionId] ?? questionSeconds) - 1, 0),
+      }))
     }, 1000)
 
     return () => window.clearInterval(intervalId)
-  }, [stage])
+  }, [stage, activeQuestion?.id, questionSeconds])
 
+  // Time's up on this question: save it and move on (or submit after the last one).
   useEffect(() => {
-    if (stage === 'base' && baseSeconds === 0) {
+    if (stage === 'base' && activeQuestion && activeSeconds === 0) {
       submitCurrentAnswer('timer')
     }
-  }, [baseSeconds, stage])
+  }, [activeSeconds, stage])
 
   useEffect(() => {
     if (stage !== 'processing' || !processingTarget) {
@@ -365,6 +374,7 @@ function InterviewWorkspace({ candidateName, onClose }) {
       await postConsent()
       const data = await getQuestions()
       questions = (data?.questions || []).map((q) => ({ id: q.question_id, type: 'base', prompt: q.text }))
+      setQuestionSeconds(data?.question_seconds || DEFAULT_QUESTION_SECONDS)
     } catch (error) {
       setApiNotice(`Could not start the interview: ${error.message}. Please try again.`)
       setIsStarting(false)
@@ -380,7 +390,7 @@ function InterviewWorkspace({ candidateName, onClose }) {
     setBaseQuestions(questions)
     setApiMode(true)
     setIsStarting(false)
-    setBaseSeconds(BASE_ROUND_SECONDS)
+    setTimeLeft({})
     setCurrentBaseIndex(0)
     setIsRecording(false)
     setResponses([])
@@ -445,7 +455,7 @@ function InterviewWorkspace({ candidateName, onClose }) {
     await saveResponse(activeQuestion, reason)
 
     if (stage === 'base') {
-      if (currentBaseIndex < baseQuestions.length - 1 && baseSeconds > 0) {
+      if (currentBaseIndex < baseQuestions.length - 1) {
         beginProcessing('Processing your answer before the next question...', 'next_base')
         return
       }
@@ -468,8 +478,12 @@ function InterviewWorkspace({ candidateName, onClose }) {
     await startRecording()
   }
 
+  // Back is only offered while the previous question still has time left.
+  const previousQuestion = baseQuestions[currentBaseIndex - 1]
+  const canGoBack = currentBaseIndex > 0 && (timeLeft[previousQuestion?.id] ?? questionSeconds) > 0
+
   const goToPreviousQuestion = async () => {
-    if (stage !== 'base' || currentBaseIndex === 0) {
+    if (stage !== 'base' || !canGoBack) {
       return
     }
 
@@ -599,7 +613,7 @@ function InterviewWorkspace({ candidateName, onClose }) {
             </div>
             <h1 id="interview-title" className="interview-question-title">{activeQuestion.prompt}</h1>
             <p className="interview-question-helper">
-              Answer naturally. All questions share one five-minute timer.
+              Answer naturally - about 1-2 minutes is ideal. Press Next when you&apos;re done.
             </p>
             {quietTake && !isRecording ? (
               <p className="invite-note error" role="alert">
@@ -632,7 +646,7 @@ function InterviewWorkspace({ candidateName, onClose }) {
                   type="button"
                   className="soft-button question-nav-button"
                   onClick={goToPreviousQuestion}
-                  disabled={currentBaseIndex === 0}
+                  disabled={!canGoBack}
                 >
                   <Icon name="arrowRight" className="flip-icon" />
                   Back
@@ -717,7 +731,7 @@ const STAGE_CARDS = {
   consent: {
     eyebrow: 'Invitation',
     title: 'Your AI interview is ready',
-    copy: 'Answer each question out loud. All questions share one 5:00 timer, so keep your answers focused.',
+    copy: 'Answer each question out loud. Every question has its own 2-minute timer - press Next whenever you are done.',
     action: 'Start interview',
   },
   base: {

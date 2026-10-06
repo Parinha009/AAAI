@@ -100,7 +100,11 @@ def questions(
     if candidate.status == "consented":
         candidate.status = "in_progress"
         db.commit()
-    return QuestionsResponse(base_round_seconds=settings.base_round_seconds, questions=items)
+    return QuestionsResponse(
+        question_seconds=settings.question_seconds,
+        base_round_seconds=settings.question_seconds * len(items),
+        questions=items,
+    )
 
 
 # --- Upload one answer (FR-02 / FR-06) -----------------------------------

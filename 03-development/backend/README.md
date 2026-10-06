@@ -108,7 +108,7 @@ candidates are seeded; every score comes from the AI pipeline.
 | POST | `/api/v1/auth/verify` | Trade a link token for a role-scoped session (FR-04) | — |
 | GET | `/api/v1/auth/me` | Who am I? (both roles) | Bearer |
 | POST | `/api/v1/interview/consent` | Record consent (FR-01) → 201; appends CONSENT audit row | Bearer (candidate) |
-| GET | `/api/v1/interview/questions` | Base questions + 5:00 timer (FR-05); **403 until consent** | Bearer + consent |
+| GET | `/api/v1/interview/questions` | This interview's 5 questions + `question_seconds` (2:00 each); **403 until consent** | Bearer + consent |
 | POST | `/api/v1/interview/responses` | Upload one answer — 20 MB cap, type allow-list (FR-02/06) → 201 | Bearer + consent |
 | GET | `/api/v1/interview/responses/{id}` | Poll transcription status (FR-07/17) | Bearer + consent |
 | POST | `/api/v1/interview/finish` | **v1.1:** submit the interview → `completed`; scoring runs once every answer is transcribed (replaces the follow-up) | Bearer + consent |
@@ -208,7 +208,8 @@ Lives in [app/pipeline.py](app/pipeline.py) (steps) and [app/ai_client.py](app/a
    or high `no_speech_prob`) is stored as `no_speech`, never as an invented transcript;
    errors become `failed`.
 2. **No AI follow-up (FR-08/09 removed).** Interviews are 5 drawn questions; the candidate
-   never sees how many. After the last answer (or the 5:00 timer) the frontend calls
+   never sees how many. **Each question has its own 2:00 timer** (`QUESTION_SECONDS`, replacing
+   FR-05's shared 5:00) and auto-advances at 0:00. After the last answer the frontend calls
    `POST /interview/finish`, which marks the interview `completed` (no more uploads).
 3. **Scoring (FR-03 / FR-10)** — once the interview is finished and every answer is transcribed: JSON mode, temperature
    0, strict schema check, one corrective retry, then **manual review** (`GRADING_FAILED`)

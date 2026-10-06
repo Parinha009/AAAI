@@ -56,7 +56,8 @@ class Settings(BaseSettings):
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
     # "Interview Physics" — fixed product constants (SRS-2.5), not user settings.
-    base_round_seconds: int = 300  # 5:00 base round (FR-05)
+    # Each question has its own countdown (replaces the shared 5:00 base round, FR-05).
+    question_seconds: int = 120  # 2:00 per question
     processing_pause_seconds: int = 15  # 15s async processing pause (FR-17)
 
     # Audio upload (SRS-FR-06).

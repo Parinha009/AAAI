@@ -28,7 +28,9 @@ def test_consent_gate(client, candidate_headers):
 
     r = client.get(f"{API}/interview/questions", headers=h)
     assert r.status_code == 200
-    assert r.json()["base_round_seconds"] == 300
+    body = r.json()
+    assert body["question_seconds"] == 120  # 2:00 per question
+    assert body["base_round_seconds"] == 120 * len(body["questions"])
     qs = r.json()["questions"]
     assert [q["order"] for q in qs] == list(range(1, len(qs) + 1))
     assert all(q["question_id"] >= 1 and q["text"] for q in qs)

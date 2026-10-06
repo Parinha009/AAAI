@@ -24,7 +24,8 @@ class Question(BaseModel):
 
 
 class QuestionsResponse(BaseModel):
-    base_round_seconds: int
+    question_seconds: int  # v1.1: each question's own countdown (2:00)
+    base_round_seconds: int  # = question_seconds x number of questions (the maximum total)
     questions: list[Question]
 
 

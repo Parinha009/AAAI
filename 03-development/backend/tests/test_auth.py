@@ -48,3 +48,17 @@ def test_sign_in_token_never_returned_by_default(client, recruiter_email, monkey
     r = client.post(f"{API}/auth/magic-link", json={"email": recruiter_email})
     assert r.status_code == 202
     assert "dev_token" not in r.json() and "dev_magic_link" not in r.json()
+
+
+def test_me_returns_the_name_the_recruiter_entered(client, job_id, recruiter_headers, login):
+    """The candidate page greets candidates by the name typed in the invite form."""
+    import uuid
+
+    email = f"named-{uuid.uuid4().hex[:8]}@test.local"
+    r = client.post(f"{API}/jobs/{job_id}/invite", headers=recruiter_headers, json={"email": email, "name": "Dara Chen"})
+    assert r.status_code == 201
+    me = client.get(f"{API}/auth/me", headers={"Authorization": f"Bearer {login(email)}"}).json()
+    assert me["role"] == "candidate" and me["name"] == "Dara Chen" and me["email"] == email
+
+    rec = client.get(f"{API}/auth/me", headers=recruiter_headers).json()
+    assert rec["role"] == "recruiter" and rec["email"] == "recruiter@demo.local"

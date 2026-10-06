@@ -25,6 +25,13 @@ const storage = {
   },
 }
 
+// Name the recruiter typed in the invite form (from /auth/me), else the email's first part.
+const profileFromMe = (me, fallbackEmail) => {
+  const email = me?.email || fallbackEmail || ''
+  const name = (me?.name || '').trim()
+  return name ? { name, email } : profileFromEmail(email, me?.role)
+}
+
 const profileFromEmail = (email, role) => ({
   name: email ? email.split('@')[0] : (role === 'recruiter' ? 'Recruiter' : 'Candidate'),
   email: email || '',
@@ -103,9 +110,9 @@ export default function App() {
       getMe(saved)
         .then((me) => {
           const dashboard = me.role === 'recruiter' ? 'company' : 'candidate'
-          let profile = null
-          try { profile = JSON.parse(storage.get(PROFILE_KEY) || 'null') } catch { profile = null }
-          setCurrentUser(profile || profileFromEmail('', me.role))
+          const profile = profileFromMe(me, '')
+          storage.set(PROFILE_KEY, JSON.stringify(profile))
+          setCurrentUser(profile)
           setCurrentRole(dashboard)
           setMode(dashboard)
         })
@@ -120,10 +127,10 @@ export default function App() {
     ;(async () => {
       try {
         const session = await verifyToken(token)
-        await getMe(session.session_token)
+        const me = await getMe(session.session_token)
         storage.set(SESSION_KEY, session.session_token)
         const dashboard = session.role === 'recruiter' ? 'company' : 'candidate'
-        const profile = profileFromEmail(storage.get(PENDING_EMAIL_KEY) || '', session.role)
+        const profile = profileFromMe(me, storage.get(PENDING_EMAIL_KEY) || '')
         storage.set(PROFILE_KEY, JSON.stringify(profile))
         storage.remove(PENDING_EMAIL_KEY)
         setCurrentUser(profile)
@@ -138,9 +145,9 @@ export default function App() {
         const me = saved ? await getMe(saved).catch(() => null) : null
         if (me) {
           const dashboard = me.role === 'recruiter' ? 'company' : 'candidate'
-          let profile = null
-          try { profile = JSON.parse(storage.get(PROFILE_KEY) || 'null') } catch { profile = null }
-          setCurrentUser(profile || profileFromEmail('', me.role))
+          const profile = profileFromMe(me, '')
+          storage.set(PROFILE_KEY, JSON.stringify(profile))
+          setCurrentUser(profile)
           setCurrentRole(dashboard)
           setMode(dashboard)
           showToast('info', 'You are already signed in', 'That sign-in link was already used, so we kept your current session.')

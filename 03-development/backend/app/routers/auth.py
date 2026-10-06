@@ -124,10 +124,15 @@ def me(session: dict = Depends(get_session), db: Session = Depends(get_db)) -> M
             raise api_error(401, "UNAUTHORIZED", "Candidate not found")
         return MeResponse(
             role="candidate",
+            name=candidate.name,
+            email=candidate.email,
             candidate_id=candidate.candidate_id,
             job_id=candidate.job_id,
             candidate_status=candidate.status,
         )
     if role == "recruiter":
-        return MeResponse(role="recruiter")
+        recruiter = db.get(Recruiter, int(session["sub"]))
+        if recruiter is None:
+            raise api_error(401, "UNAUTHORIZED", "Recruiter not found")
+        return MeResponse(role="recruiter", name=recruiter.name, email=recruiter.email)
     raise api_error(401, "UNAUTHORIZED", "Unknown session role")

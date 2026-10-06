@@ -128,7 +128,8 @@ re-sends the link. Once it is `completed`/`expired`, a re-invite creates a **new
 (a new `candidate_id`; the response says `new_interview: true`). The old interview, its
 recordings and its append-only audit trail are kept, and signing in opens the newest one.
 
-> **Contract v1.1 note:** `POST /jobs/{id}/invite` and `GET /jobs/{id}/candidates` are *additions* to API Contract v1
+> **Contract v1.1 note:** `GET /auth/me` now also returns optional `name` and `email` (a candidate's
+> `name` is what the recruiter typed in the invite form). `POST /jobs/{id}/invite` and `GET /jobs/{id}/candidates` are *additions* to API Contract v1
 > (candidates are invited, never self-registered — SRS-2.3/FR-04; the leaderboard only lists
 > scored candidates, so the dashboard needs the full list). Log them with the Lead.
 

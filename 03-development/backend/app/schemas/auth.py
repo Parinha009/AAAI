@@ -35,6 +35,10 @@ class VerifyResponse(BaseModel):
 
 class MeResponse(BaseModel):
     role: str
+    # v1.1: who is signed in. For a candidate, `name` is what the recruiter typed in
+    # the invite form (null if they left it blank).
+    name: str | None = None
+    email: str | None = None
     candidate_id: int | None = None
     job_id: int | None = None
     candidate_status: str | None = None

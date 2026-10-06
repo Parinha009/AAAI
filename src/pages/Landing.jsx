@@ -6,6 +6,7 @@ const navItems = [
   { id: 'capabilities', label: 'How it works' },
   { id: 'benefits', label: 'Why AAAI' },
   { id: 'fairness', label: 'Fairness & privacy' },
+  { id: 'faqs', label: 'FAQs' },
 ]
 
 // "Core capabilities": the four real steps, each with a small mock-up of that screen.
@@ -40,6 +41,59 @@ const hiringProjects = [
   'Cybersecurity Analyst',
   'IT Support Specialist',
 ]
+
+// Answers describe the real product. On purpose they never say how many questions an
+// interview has - candidates are not told that in advance.
+const faqs = [
+  {
+    q: 'What is AAAI?',
+    a: 'AAAI (Automated Asynchronous AI Interviewer) runs first-round interviews by voice. Candidates answer spoken questions on their own time; AAAI transcribes and scores each interview, and recruiters review a ranked, explained shortlist.',
+  },
+  {
+    q: 'How does an interview work for candidates?',
+    a: 'The recruiter sends an invitation email. The candidate opens the link, agrees to recording, checks their microphone, and answers a short set of questions out loud. Each question has its own 2-minute timer and they press Next when they are done.',
+  },
+  {
+    q: 'Do candidates need a camera, an app or a password?',
+    a: 'No. Interviews are voice only and run in the browser - just a microphone. Sign-in uses a one-time link from the invitation email, so there is no password to create or forget.',
+  },
+  {
+    q: 'How are answers scored?',
+    a: 'Whisper transcribes each answer. GPT-4o-mini then scores four traits - technical skill, communication, problem solving and job fit - from 1 to 5 against the job\'s written rubric, with a reason for each score. Answers that sound templated or scripted have their communication score capped.',
+  },
+  {
+    q: 'Does the AI make the hiring decision?',
+    a: 'No. AI suggests scores; people decide. Recruiters can read every transcript, play every recording and see why a candidate was flagged - for example a low communication score, frequent tab switches or a grading failure.',
+  },
+  {
+    q: 'What happens to recordings and data?',
+    a: 'Recordings are shared only with the hiring team. Every AI request and response is stored in an append-only audit log that cannot be edited or deleted, and AI spending has a hard monthly cap.',
+  },
+  {
+    q: 'Which roles can we interview for?',
+    a: 'There are 12 ready-made hiring projects - from Junior Backend Engineer to Data Analyst and IT Support Specialist - each with its own question bank and rubric. Every interview draws its own random questions, so candidates do not all get the same ones.',
+  },
+]
+
+const footerLinks = [
+  { id: 'capabilities', label: 'How it works' },
+  { id: 'benefits', label: 'Why AAAI' },
+  { id: 'fairness', label: 'Fairness & privacy' },
+  { id: 'faqs', label: 'FAQs' },
+]
+
+const team = [
+  { name: 'Thaing Parinha', role: 'Project Lead' },
+  { name: 'Soeng Senghorng', role: 'Frontend' },
+  { name: 'Lim Hokan', role: 'Backend' },
+  { name: 'Uy Sovannareach', role: 'AI / Infrastructure' },
+]
+
+// Decorative letter texture behind the footer wordmark.
+const FOOTER_TEXTURE = Array.from({ length: 26 }, (_, row) => {
+  const words = ['AAAI', 'INTERVIEW', 'VOICE', 'SCORE', 'REVIEW', 'FAIR', 'ASYNC']
+  return Array.from({ length: 22 }, (_, col) => words[(row * 3 + col) % words.length]).join(' ')
+}).join('\n')
 
 const roleOptions = [
   {
@@ -408,12 +462,53 @@ export default function Landing({
         </div>
       </section>
 
-      <footer className="site-footer">
-        <div>
-          <img src="/logo.svg" alt="" className="footer-logo" />
-          <span>AAAI</span>
+      <section className="lx-faq" id="faqs" aria-labelledby="faq-title">
+        <header className="lx-faq-head">
+          <h2 id="faq-title">FAQs</h2>
+          <p>Answers to common questions about AAAI - how interviews work, how answers are scored, and how candidates are treated fairly.</p>
+        </header>
+        <div className="lx-faq-list">
+          {faqs.map((item, index) => (
+            <details className="lx-faq-item" key={item.q}>
+              <summary>
+                <span>{index + 1}. {item.q}</span>
+                <span className="lx-faq-icon" aria-hidden="true" />
+              </summary>
+              <p>{item.a}</p>
+            </details>
+          ))}
         </div>
-        <p>Automated Asynchronous AI Interviewer - a university capstone project.</p>
+      </section>
+
+      <footer className="lx-footer">
+        <pre className="lx-footer-texture" aria-hidden="true">{FOOTER_TEXTURE}</pre>
+        <div className="lx-footer-top">
+          <div className="lx-footer-brand">
+            <strong className="lx-wordmark">AAAI</strong>
+            <p>The Automated Asynchronous AI Interviewer - spoken interviews, scored fairly and reviewed by people.</p>
+          </div>
+          <nav className="lx-footer-col" aria-label="Footer">
+            <h3>Explore</h3>
+            {footerLinks.map((link) => (
+              <button type="button" key={link.id} onClick={() => scrollToSection(link.id)}>
+                {link.label}
+              </button>
+            ))}
+          </nav>
+          <div className="lx-footer-col">
+            <h3>Team</h3>
+            {team.map((member) => (
+              <span key={member.name}>
+                {member.name}
+                <small>{member.role}</small>
+              </span>
+            ))}
+          </div>
+        </div>
+        <div className="lx-footer-bottom">
+          <span>&copy; 2026 AAAI &middot; University capstone project</span>
+          <span>Built with React, FastAPI, Whisper &amp; GPT-4o-mini</span>
+        </div>
       </footer>
 
       {isDialogOpen ? (

@@ -7086,3 +7086,216 @@ img {
 .pricing-card .solid-button:hover {
   background: #eef3ff;
 }
+
+/* ===== Landing: FAQs ===== */
+.lx-faq {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 48px;
+  width: min(1200px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 96px 0 72px;
+}
+
+.lx-faq-head h2 {
+  margin: 0 0 14px;
+  color: var(--text);
+  font-size: clamp(2.6rem, 5.4vw, 4.4rem);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.lx-faq-head p {
+  max-width: 400px;
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.lx-faq-list {
+  display: grid;
+  gap: 10px;
+}
+
+.lx-faq-item {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.lx-faq-item[open] {
+  border-color: rgba(49, 94, 234, 0.35);
+  box-shadow: 0 10px 24px rgba(49, 94, 234, 0.08);
+}
+
+.lx-faq-item summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  cursor: pointer;
+  list-style: none;
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.lx-faq-item summary::-webkit-details-marker { display: none; }
+
+.lx-faq-icon {
+  position: relative;
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+}
+
+.lx-faq-icon::before,
+.lx-faq-icon::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 14px;
+  height: 1.5px;
+  background: var(--accent);
+  transition: transform 0.2s ease;
+}
+
+.lx-faq-icon::after { transform: rotate(90deg); }
+.lx-faq-item[open] .lx-faq-icon::after { transform: rotate(0deg); }
+
+.lx-faq-item p {
+  margin: 0;
+  padding: 0 18px 18px;
+  color: var(--muted);
+  line-height: 1.6;
+  font-size: 0.92rem;
+}
+
+/* ===== Landing: big dark footer ===== */
+.lx-footer {
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  width: min(1240px, calc(100% - 32px));
+  margin: 24px auto 24px;
+  padding: 48px clamp(24px, 4vw, 48px) 24px;
+  border-radius: 20px;
+  color: #dfe8ff;
+  background:
+    radial-gradient(circle at 15% 0%, rgba(49, 94, 234, 0.45), transparent 45%),
+    linear-gradient(160deg, #0f1f4d 0%, #0b1638 100%);
+}
+
+.lx-footer-texture {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  overflow: hidden;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  letter-spacing: 0.08em;
+  color: rgba(123, 160, 255, 0.15);
+  white-space: pre;
+  pointer-events: none;
+  user-select: none;
+  -webkit-mask-image: radial-gradient(ellipse at 30% 25%, #000 0%, rgba(0, 0, 0, 0.45) 45%, transparent 75%);
+  mask-image: radial-gradient(ellipse at 30% 25%, #000 0%, rgba(0, 0, 0, 0.45) 45%, transparent 75%);
+}
+
+.lx-footer-top {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 0.7fr) minmax(0, 0.9fr);
+  gap: 32px;
+  min-height: 260px;
+}
+
+.lx-wordmark {
+  display: block;
+  color: #fff;
+  font-size: clamp(4rem, 12vw, 9rem);
+  font-weight: 800;
+  line-height: 0.9;
+  letter-spacing: -0.05em;
+}
+
+.lx-footer-brand p {
+  max-width: 340px;
+  margin: 16px 0 0;
+  color: rgba(223, 232, 255, 0.8);
+  line-height: 1.55;
+  font-size: 0.92rem;
+}
+
+.lx-footer-col {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+}
+
+.lx-footer-col h3 {
+  margin: 0 0 6px;
+  color: rgba(223, 232, 255, 0.55);
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.lx-footer-col button {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #fff;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.lx-footer-col button:hover { color: #9fb8ff; }
+
+.lx-footer-col span {
+  display: grid;
+  color: #fff;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.lx-footer-col small {
+  color: rgba(223, 232, 255, 0.6);
+  font-weight: 500;
+  font-size: 0.76rem;
+}
+
+.lx-footer-bottom {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 48px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(223, 232, 255, 0.16);
+  color: rgba(223, 232, 255, 0.6);
+  font-size: 0.8rem;
+}
+
+@media (max-width: 900px) {
+  .lx-faq { grid-template-columns: 1fr; gap: 28px; }
+  .lx-footer-top { grid-template-columns: 1fr 1fr; }
+  .lx-footer-brand { grid-column: 1 / -1; }
+}
+
+@media (max-width: 560px) {
+  .lx-footer-top { grid-template-columns: 1fr; }
+}

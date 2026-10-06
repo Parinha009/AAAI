@@ -84,9 +84,10 @@ envelope `{ "error": { "code", "message", "details" } }`. Seed demo data first:
 python -m app.seed   # the Lead's job + rubric, plus logins (see below)
 ```
 
-**Hiring projects + random questions (FR-05):** the seed creates 6 jobs — the Lead's
-*Junior Backend Engineer*, plus *Senior Frontend*, *Full-Stack*, *QA*, *DevOps* and *Data
-Analyst* ([app/seed_jobs.py](app/seed_jobs.py)). Each has a **bank of 12 questions** (3 per
+**Hiring projects + random questions (FR-05):** the seed creates 12 jobs — the Lead's
+*Junior Backend Engineer*, plus *Senior Frontend*, *Full-Stack*, *QA*, *DevOps*, *Data Analyst*,
+*Mobile App Developer*, *UI/UX Designer*, *Product Manager*, *Machine Learning Engineer*,
+*Cybersecurity Analyst* and *IT Support Specialist* ([app/seed_jobs.py](app/seed_jobs.py)). Each has a **bank of 12 questions** (3 per
 trait). Every interview draws **4 at random — one per trait — in random order**
 ([app/questions.py](app/questions.py)), avoids questions that email already answered, and
 saves the draw in `candidates.assigned_questions` (migration `0003`) so a refresh shows the

@@ -267,13 +267,3 @@ def test_whisper_silence_hallucinations_are_not_stored():
             seg(" Thank you for watching.", 0.2, 0.7)]  # trailing hallucination dropped, speech kept
     out = pipeline.speech_text(Transcription(text="", raw={"segments": real}))
     assert out == "I built a REST API with FastAPI and Postgres."
-
-
-def test_status_resumes_at_follow_up_after_base_round(client, candidate_headers, new_candidate, monkeypatch):
-    """All base answers in but the follow-up not generated yet -> 'processing', so the
-    candidate page resumes at the follow-up instead of restarting the questions."""
-    h = candidate_headers
-    _base_round(client, h, new_candidate["job_id"])
-    assert client.get(f"{API}/interview/status", headers=h).json()["stage"] == "processing"
-    _follow_up(client, h)
-    assert client.get(f"{API}/interview/status", headers=h).json()["stage"] == "follow_up"

@@ -3,51 +3,27 @@ import Icon from '../components/Icon'
 
 // Every statement on this page describes what AAAI actually does today.
 const navItems = [
-  { id: 'how-it-works', label: 'How it works' },
-  { id: 'for-candidates', label: 'For candidates' },
-  { id: 'for-recruiters', label: 'For recruiters' },
+  { id: 'capabilities', label: 'How it works' },
+  { id: 'benefits', label: 'Why AAAI' },
   { id: 'fairness', label: 'Fairness & privacy' },
 ]
 
-const workflowSteps = [
-  {
-    count: '01',
-    title: 'Invite',
-    copy: 'A recruiter invites a candidate by email to a hiring project. They sign in with a one-time link - no password.',
-  },
-  {
-    count: '02',
-    title: 'Interview',
-    copy: 'After consent and a microphone check, the candidate answers questions out loud - 2 minutes each, drawn at random for every interview.',
-  },
-  {
-    count: '03',
-    title: 'AI scoring',
-    copy: 'Whisper transcribes each answer; GPT-4o-mini scores technical skill, communication, problem solving and job fit (1-5) with a written rationale.',
-  },
-  {
-    count: '04',
-    title: 'Human review',
-    copy: 'Recruiters see a ranked leaderboard, read transcripts, play recordings and check review flags. A person makes the decision.',
-  },
+// "Core capabilities": the four real steps, each with a small mock-up of that screen.
+const capabilities = [
+  { count: '01', title: 'Invite', copy: 'A recruiter emails a one-time sign-in link for a hiring project.' },
+  { count: '02', title: 'Interview', copy: 'Candidates answer out loud - 2 minutes per question, drawn at random.' },
+  { count: '03', title: 'Score', copy: 'Whisper transcribes; GPT-4o-mini scores four traits with a rationale.' },
+  { count: '04', title: 'Review', copy: 'Recruiters rank, read, listen and decide - AI assists, people choose.' },
 ]
 
-const candidatePoints = [
-  'Voice only - no camera, no video',
-  'Answer at a time that suits you',
-  '2 minutes per question, press Next when done',
-  'Microphone check before you start',
-  'Re-record an answer while you are on it',
-  'One-time email sign-in link',
-]
-
-const recruiterPoints = [
-  'Invite candidates by email',
-  'Ranked leaderboard per hiring project',
-  'Transcripts and playable recordings',
-  'Review flags with clear reasons',
-  'Tab-switch tracking and paste lock',
-  'Append-only audit trail of every AI call',
+// "How AAAI helps": six benefits, each backed by a real feature.
+const benefits = [
+  { icon: 'clock', title: 'Save scheduling time', copy: 'No calendars or live interviewers - candidates answer whenever suits them.' },
+  { icon: 'clipboard', title: 'Consistent for everyone', copy: 'Every candidate is scored on the same four traits against a written rubric.' },
+  { icon: 'mic', title: 'Voice only, no video', copy: 'Judged on what candidates say, not how they look on camera.' },
+  { icon: 'play', title: 'Evidence you can check', copy: 'Each score comes with the transcript, the reasoning and the recording.' },
+  { icon: 'flag', title: 'Flags what needs a look', copy: 'Low communication, frequent tab switches or a grading failure are flagged with the reason.' },
+  { icon: 'shield', title: 'Accountable AI', copy: 'Every AI request is kept in an append-only audit log, with a hard monthly spending cap.' },
 ]
 
 const hiringProjects = [
@@ -248,7 +224,7 @@ export default function Landing({
                 Get started
               </button>
             )}
-            <button type="button" className="soft-button" onClick={() => scrollToSection('how-it-works')}>
+            <button type="button" className="soft-button" onClick={() => scrollToSection('capabilities')}>
               See how it works
             </button>
           </div>
@@ -308,58 +284,98 @@ export default function Landing({
         </div>
       </section>
 
-      <section className="section-band" id="how-it-works" aria-labelledby="workflow-title">
-        <div className="section-heading">
-          <p className="eyebrow">How it works</p>
-          <h2 id="workflow-title">From invitation to shortlist in four steps.</h2>
-          <p>No scheduling, no live interviewer, and every candidate gets the same structured process.</p>
-        </div>
+      <section className="lx-capabilities" id="capabilities" aria-labelledby="capabilities-title">
+        <header className="lx-cap-head">
+          <h2 id="capabilities-title">Core Capabilities</h2>
+          <p>
+            AAAI runs the first-round interview for you - from the invitation email to a ranked, explained
+            shortlist - so recruiters spend their time on the candidates worth meeting.
+          </p>
+        </header>
 
-        <div className="workflow-grid four">
-          {workflowSteps.map((step) => (
-            <article className="workflow-card" key={step.count}>
-              <span>{step.count}</span>
-              <h3>{step.title}</h3>
-              <p>{step.copy}</p>
+        <div className="lx-cap-grid">
+          {capabilities.map((item, index) => (
+            <article className="lx-cap" key={item.count}>
+              <div className={`lx-visual v${index + 1}`} aria-hidden="true">
+                {index === 0 ? (
+                  <div className="lx-mock lx-mail">
+                    <span className="lx-mono">[INVITATION]</span>
+                    <strong>Junior Backend Engineer</strong>
+                    <p>You&apos;re invited to an AI interview.</p>
+                    <span className="lx-mail-button">Sign in <Icon name="arrowRight" size={12} /></span>
+                    <small>One-time link - expires in 15 min</small>
+                  </div>
+                ) : null}
+                {index === 1 ? (
+                  <div className="lx-mock lx-task">
+                    <small>Interview in progress</small>
+                    <ol>
+                      <li className="done"><Icon name="check" size={11} /> Consent recorded</li>
+                      <li className="done"><Icon name="check" size={11} /> Microphone check</li>
+                      <li className="active"><span className="lx-spin" /> Question 3 <em>1:24</em></li>
+                      <li><span className="lx-dot" /> Submit interview</li>
+                    </ol>
+                    <div className="lx-live">
+                      <Icon name="mic" size={14} />
+                      <span>Recording<small>Answer saved on Next</small></span>
+                      <b>LIVE</b>
+                    </div>
+                  </div>
+                ) : null}
+                {index === 2 ? (
+                  <div className="lx-mock lx-analyze">
+                    <div className="lx-chip"><Icon name="document" size={13} /> Transcribing...</div>
+                    <div className="lx-card">
+                      <small>Scoring answers...</small>
+                      <span className="lx-line w90" />
+                      <span className="lx-line w70" />
+                      <span className="lx-line w80" />
+                      <div className="lx-bar"><span className="lx-spin light" /></div>
+                    </div>
+                  </div>
+                ) : null}
+                {index === 3 ? (
+                  <div className="lx-mock lx-terminal">
+                    <span className="lx-mono">&#9632; [TRANSCRIPT]</span>
+                    <p>&quot;I built a REST API with FastAPI and Postgres, then added caching...&quot;</p>
+                    <span className="lx-mono">&#9632; [SCORECARD]</span>
+                    <p>17 / 20 - communication 5/5 - no review flags</p>
+                  </div>
+                ) : null}
+              </div>
+              <span className="lx-count">{item.count}</span>
+              <h3>{item.title}</h3>
+              <p>{item.copy}</p>
             </article>
           ))}
         </div>
       </section>
 
-      <section className="split-section" id="for-candidates" aria-labelledby="candidates-title">
-        <div>
-          <p className="eyebrow">For candidates</p>
-          <h2 id="candidates-title">A calm interview you can take on your own time.</h2>
+      <section className="lx-benefits" id="benefits" aria-labelledby="benefits-title">
+        <header className="lx-benefits-head">
+          <h2 id="benefits-title">How AAAI Helps</h2>
           <p>
-            Open the invitation email, sign in with one click, and answer each question out loud. Every interview
-            draws its own questions, so there is nothing to memorise - just speak naturally.
+            Faster first-round screening that stays fair, explainable and human-led - across{' '}
+            {hiringProjects.length} ready-made hiring projects.
           </p>
-        </div>
+        </header>
 
-        <div className="use-case-list">
-          {candidatePoints.map((item) => (
-            <span key={item}>{item}</span>
+        <div className="lx-benefit-grid">
+          {benefits.map((item) => (
+            <article className="lx-benefit" key={item.title}>
+              <span className="lx-benefit-icon" aria-hidden="true">
+                <Icon name={item.icon} size={20} />
+              </span>
+              <div>
+                <h3>{item.title}</h3>
+                <p>{item.copy}</p>
+              </div>
+            </article>
           ))}
         </div>
-      </section>
 
-      <section className="split-section" id="for-recruiters" aria-labelledby="recruiters-title">
-        <div>
-          <p className="eyebrow">For recruiters</p>
-          <h2 id="recruiters-title">Structured evidence for every candidate.</h2>
-          <p>
-            Pick a hiring project, invite candidates, and review a ranked leaderboard. Each project has its own
-            question bank and rubric - {hiringProjects.length} are ready to use:
-          </p>
-          <div className="use-case-list compact">
-            {hiringProjects.map((item) => (
-              <span key={item}>{item}</span>
-            ))}
-          </div>
-        </div>
-
-        <div className="use-case-list">
-          {recruiterPoints.map((item) => (
+        <div className="lx-projects" aria-label="Ready-made hiring projects">
+          {hiringProjects.map((item) => (
             <span key={item}>{item}</span>
           ))}
         </div>

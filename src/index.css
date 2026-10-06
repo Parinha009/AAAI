@@ -6660,3 +6660,429 @@ img {
     grid-template-columns: 1fr;
   }
 }
+
+/* ===== Landing middle: Core Capabilities + How AAAI Helps ===== */
+.lx-capabilities,
+.lx-benefits {
+  position: relative;
+  z-index: 1;
+  width: min(1200px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 96px 0 24px;
+}
+
+.lx-cap-head {
+  display: grid;
+  grid-template-columns: 1fr minmax(0, 420px);
+  align-items: end;
+  gap: 32px;
+  margin-bottom: 40px;
+}
+
+.lx-cap-head h2,
+.lx-benefits-head h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: clamp(2.4rem, 5.4vw, 4.2rem);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.lx-cap-head p,
+.lx-benefits-head p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.98rem;
+  line-height: 1.55;
+}
+
+.lx-cap-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.lx-cap h3 {
+  margin: 14px 0 6px;
+  color: var(--text);
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.lx-cap > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.lx-count {
+  display: block;
+  margin-top: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line-strong);
+  color: var(--subtle);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+/* the four visual tiles, textured in AAAI blues */
+.lx-visual {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  border-radius: 6px;
+  padding: 18px;
+}
+
+.lx-visual.v1 {
+  background:
+    radial-gradient(circle at 30% 40%, rgba(123, 160, 255, 0.55) 0 1.4px, transparent 1.6px) 0 0 / 7px 7px,
+    radial-gradient(ellipse at 40% 45%, #2f5bea 0%, #173f9e 55%, #0f2a6b 100%);
+}
+
+.lx-visual.v2 {
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.16) 0 2px, transparent 2px 6px),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.12) 0 2px, transparent 2px 6px),
+    linear-gradient(160deg, #315eea 0%, #2347bd 100%);
+}
+
+.lx-visual.v3 {
+  background:
+    radial-gradient(circle at 70% 20%, rgba(255, 255, 255, 0.55), transparent 45%),
+    linear-gradient(180deg, #c9d6f5 0%, #9fb3e6 100%);
+}
+
+.lx-visual.v4 {
+  background:
+    radial-gradient(circle at 75% 25%, rgba(125, 211, 252, 0.45), transparent 40%),
+    radial-gradient(circle at 20% 85%, rgba(49, 94, 234, 0.6), transparent 50%),
+    linear-gradient(160deg, #0f1f4d 0%, #142a66 100%);
+}
+
+.lx-mock {
+  width: 100%;
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.lx-mono {
+  display: block;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+}
+
+/* 01 invite email */
+.lx-mail {
+  display: grid;
+  gap: 6px;
+  max-width: 220px;
+  padding: 16px;
+  border-radius: 10px;
+  color: #fff;
+  background: rgba(10, 26, 72, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+.lx-mail strong { font-size: 0.86rem; }
+.lx-mail p { margin: 0; opacity: 0.85; }
+.lx-mail small { opacity: 0.7; font-size: 0.64rem; }
+
+.lx-mail-button {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  color: #1f4fd8;
+  background: #fff;
+  font-weight: 700;
+}
+
+/* 02 task in progress */
+.lx-task {
+  display: grid;
+  gap: 8px;
+  max-width: 230px;
+  padding: 12px;
+  border-radius: 10px;
+  color: var(--text);
+  background: #fff;
+  box-shadow: 0 10px 24px rgba(10, 30, 90, 0.25);
+}
+
+.lx-task > small { color: var(--subtle); }
+
+.lx-task ol {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lx-task li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--subtle);
+}
+
+.lx-task li .icon,
+.lx-task li svg {
+  flex-shrink: 0;
+  padding: 2px;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--success);
+}
+
+.lx-task li.done { color: var(--muted); }
+.lx-task li.active { color: var(--text); font-weight: 700; }
+
+.lx-task li em {
+  margin-left: auto;
+  padding: 1px 6px;
+  border-radius: 4px;
+  color: #fff;
+  background: var(--text);
+  font-style: normal;
+  font-size: 0.64rem;
+}
+
+.lx-dot {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 1.5px solid #cfd8e3;
+}
+
+.lx-spin {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 2px solid rgba(49, 94, 234, 0.25);
+  border-top-color: var(--accent);
+  animation: lx-spin 0.9s linear infinite;
+}
+
+.lx-spin.light {
+  border-color: rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+}
+
+@keyframes lx-spin {
+  to { transform: rotate(360deg); }
+}
+
+.lx-live {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 8px;
+  background: var(--surface-soft);
+}
+
+.lx-live span { display: grid; font-weight: 700; }
+.lx-live small { color: var(--subtle); font-weight: 500; font-size: 0.62rem; }
+
+.lx-live b {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.6rem;
+  color: var(--muted);
+}
+
+.lx-live b::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #e5484d;
+  animation: lx-blink 1.2s ease-in-out infinite;
+}
+
+@keyframes lx-blink {
+  50% { opacity: 0.3; }
+}
+
+/* 03 analyse */
+.lx-analyze {
+  display: grid;
+  gap: 10px;
+  max-width: 230px;
+}
+
+.lx-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  justify-self: stretch;
+  padding: 9px 10px;
+  border-radius: 8px;
+  color: var(--text);
+  background: #fff;
+  box-shadow: 0 6px 16px rgba(23, 43, 85, 0.12);
+}
+
+.lx-card {
+  display: grid;
+  gap: 7px;
+  padding: 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 6px 16px rgba(23, 43, 85, 0.12);
+}
+
+.lx-card small { color: var(--muted); }
+
+.lx-line {
+  height: 5px;
+  border-radius: 4px;
+  background: #e1e7f2;
+}
+
+.lx-line.w90 { width: 90%; }
+.lx-line.w70 { width: 70%; }
+.lx-line.w80 { width: 80%; }
+
+.lx-bar {
+  display: grid;
+  place-items: center;
+  margin-top: 6px;
+  padding: 8px;
+  border-radius: 6px;
+  background: var(--text);
+}
+
+/* 04 terminal-style review */
+.lx-terminal {
+  display: grid;
+  gap: 6px;
+  align-self: start;
+  margin-top: 20%;
+  color: #cfe0ff;
+}
+
+.lx-terminal p {
+  margin: 0 0 10px;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 0.7rem;
+  color: #fff;
+  opacity: 0.85;
+}
+
+/* How AAAI helps */
+.lx-benefits {
+  padding-top: 120px;
+}
+
+.lx-benefits-head {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  max-width: 640px;
+  margin: 0 auto 48px;
+  text-align: center;
+}
+
+.lx-benefit-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 36px 32px;
+}
+
+.lx-benefit {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 14px;
+}
+
+.lx-benefit-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  color: var(--charcoal);
+  background: var(--accent-soft);
+  border: 1px solid rgba(49, 94, 234, 0.12);
+}
+
+.lx-benefit h3 {
+  margin: 2px 0 4px;
+  color: var(--text);
+  font-size: 1.02rem;
+  font-weight: 800;
+}
+
+.lx-benefit p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.lx-projects {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 48px;
+}
+
+.lx-projects span {
+  padding: 6px 12px;
+  border-radius: 999px;
+  color: var(--charcoal);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+@media (max-width: 1080px) {
+  .lx-cap-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .lx-benefit-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 680px) {
+  .lx-cap-head { grid-template-columns: 1fr; }
+  .lx-cap-grid,
+  .lx-benefit-grid { grid-template-columns: 1fr; }
+  .lx-visual { aspect-ratio: 4 / 3; }
+  .lx-capabilities,
+  .lx-benefits { width: calc(100% - 32px); padding-top: 64px; }
+}
+
+/* Landing hero: the longer real headline needs a smaller size than the template title */
+.landing-hero .hero-copy h1 {
+  font-size: clamp(2.5rem, 5vw, 4.5rem);
+  line-height: 1.02;
+}
+
+/* Readable CTA on the dark invite-only card (was blue-on-blue) */
+.pricing-card .solid-button {
+  color: var(--charcoal);
+  background: #fff;
+  box-shadow: 0 10px 22px rgba(10, 30, 90, 0.25);
+}
+
+.pricing-card .solid-button:hover {
+  background: #eef3ff;
+}

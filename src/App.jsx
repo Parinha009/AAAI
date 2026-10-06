@@ -131,8 +131,29 @@ export default function App() {
         setMode(dashboard)
         showToast('success', 'Signed in', `Verified by the server as ${session.role}.`)
       } catch (error) {
+        // Each link works once (FR-04). Re-opening one that was already used is common
+        // (clicking the email again, an older invite email): if this browser is still
+        // signed in, just continue instead of showing an error.
+        const saved = storage.get(SESSION_KEY)
+        const me = saved ? await getMe(saved).catch(() => null) : null
+        if (me) {
+          const dashboard = me.role === 'recruiter' ? 'company' : 'candidate'
+          let profile = null
+          try { profile = JSON.parse(storage.get(PROFILE_KEY) || 'null') } catch { profile = null }
+          setCurrentUser(profile || profileFromEmail('', me.role))
+          setCurrentRole(dashboard)
+          setMode(dashboard)
+          showToast('info', 'You are already signed in', 'That sign-in link was already used, so we kept your current session.')
+          return
+        }
+        storage.remove(SESSION_KEY)
+        storage.remove(PROFILE_KEY)
         setMode('login')
-        showToast('error', 'Sign-in link invalid or expired', error.message)
+        showToast(
+          'error',
+          'This sign-in link has already been used or has expired',
+          'Each link works once and expires after 15 minutes. Enter your email to get a new one.',
+        )
       }
     })()
   }, [])

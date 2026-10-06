@@ -45,6 +45,8 @@ _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 router = APIRouter(tags=["recruiter"])
 
 LOW_COMMUNICATION = 2
+# A re-invite after one of these starts a fresh interview instead of re-sending the link.
+FINISHED_STATUSES = ("completed", "expired")
 HIGH_TAB_OUT = 3
 
 
@@ -224,8 +226,10 @@ def response_audio(response_id: int, db: Session = Depends(get_db)) -> FileRespo
 )
 def invite_candidate(job_id: int, payload: InviteRequest, db: Session = Depends(get_db)) -> InviteResponse:
     """Candidates are invited by a recruiter, never self-registered (SRS-2.3 / FR-04).
-    Creates the candidate for this job (or re-uses an existing invite) and emails a
-    single-use sign-in link. Re-inviting the same email simply re-sends the link."""
+    Creates the candidate for this job and emails a single-use sign-in link.
+    Re-inviting the same email while their interview is still open just re-sends the
+    link. If their latest interview is finished (completed/expired), a NEW interview
+    is created - the old one, its recordings and its append-only audit trail are kept."""
     job = db.get(Job, job_id)
     if job is None:
         raise api_error(404, "NOT_FOUND", "No such job")
@@ -236,17 +240,25 @@ def invite_candidate(job_id: int, payload: InviteRequest, db: Session = Depends(
     if db.query(Recruiter).filter(func.lower(Recruiter.email) == email).first() is not None:
         raise api_error(409, "CONFLICT", "That email belongs to a recruiter account")
 
-    candidate = (
-        db.query(Candidate).filter(func.lower(Candidate.email) == email, Candidate.job_id == job_id).first()
+    latest = (
+        db.query(Candidate)
+        .filter(func.lower(Candidate.email) == email, Candidate.job_id == job_id)
+        .order_by(Candidate.candidate_id.desc())
+        .first()
     )
-    if candidate is None:
-        candidate = Candidate(job_id=job_id, email=email, name=payload.name, status="invited")
+    new_interview = latest is not None and latest.status in FINISHED_STATUSES
+    if latest is None or new_interview:
+        candidate = Candidate(
+            job_id=job_id, email=email, name=payload.name or (latest.name if latest else None), status="invited"
+        )
         db.add(candidate)
         db.commit()
         db.refresh(candidate)
-    elif payload.name and not candidate.name:
-        candidate.name = payload.name
-        db.commit()
+    else:
+        candidate = latest
+        if payload.name and not candidate.name:
+            candidate.name = payload.name
+            db.commit()
 
     raw, link = issue_magic_link(db, email=email, role="candidate", job_id=job_id)
 
@@ -256,6 +268,7 @@ def invite_candidate(job_id: int, payload: InviteRequest, db: Session = Depends(
         email=email,
         name=candidate.name,
         candidate_status=candidate.status,
+        new_interview=new_interview,
     )
     if settings.expose_dev_tokens:  # tests only - see config.expose_dev_tokens
         resp.dev_magic_link = link

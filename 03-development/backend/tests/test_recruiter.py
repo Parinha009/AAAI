@@ -129,3 +129,43 @@ def test_candidate_audit_trail(client, candidate_headers, new_candidate, recruit
 
     assert client.get(f"{API}/candidates/999999/audit", headers=recruiter_headers).status_code == 404
     assert client.get(f"{API}/candidates/{cid}/audit", headers=candidate_headers).status_code == 403
+
+
+def test_reinvite_after_completed_interview_starts_a_new_one(client, job_id, recruiter_headers, login):
+    """Same email can interview again: a finished interview is kept, a new one is created,
+    and the sign-in link opens the new one. Mid-interview re-invites just re-send."""
+    import uuid
+
+    from app.database import SessionLocal
+    from app.models import Candidate
+
+    email = f"again-{uuid.uuid4().hex[:8]}@test.local"
+    first = client.post(f"{API}/jobs/{job_id}/invite", headers=recruiter_headers, json={"email": email, "name": "Again"})
+    assert first.status_code == 201 and first.json()["new_interview"] is False
+    first_id = first.json()["candidate_id"]
+
+    # still open -> re-send, same interview
+    again = client.post(f"{API}/jobs/{job_id}/invite", headers=recruiter_headers, json={"email": email})
+    assert again.json()["candidate_id"] == first_id and again.json()["new_interview"] is False
+
+    db = SessionLocal()
+    try:
+        db.get(Candidate, first_id).status = "completed"
+        db.commit()
+    finally:
+        db.close()
+
+    second = client.post(f"{API}/jobs/{job_id}/invite", headers=recruiter_headers, json={"email": email.upper()})
+    assert second.status_code == 201
+    body = second.json()
+    assert body["new_interview"] is True and body["candidate_id"] != first_id
+    assert body["candidate_status"] == "invited" and body["name"] == "Again"  # name carried over
+
+    # signing in with the same email opens the NEW interview
+    token = login(email)
+    me = client.get(f"{API}/auth/me", headers={"Authorization": f"Bearer {token}"}).json()
+    assert me["candidate_id"] == body["candidate_id"] and me["candidate_status"] == "invited"
+
+    # both interviews stay visible to the recruiter
+    ids = {c["candidate_id"] for c in client.get(f"{API}/jobs/{job_id}/candidates", headers=recruiter_headers).json()["candidates"]}
+    assert {first_id, body["candidate_id"]} <= ids

@@ -168,6 +168,7 @@ function candidateSearchText(candidate) {
     candidate.name,
     candidate.email,
     `#${candidate.apiCandidateId}`,
+    candidate.attempt ? `interview ${candidate.attempt}` : '',
     candidate.role,
     candidate.status,
     candidate.confidence,
@@ -300,7 +301,9 @@ function InviteCandidatePanel({ onInvited }) {
       const res = await inviteCandidate(jobId, { email: email.trim(), name: name.trim() })
       setResult({
         type: 'success',
-        text: `Invite sent to ${res.email}. They'll receive a one-time sign-in link by email.`,
+        text: res.new_interview
+          ? `New interview created for ${res.email} - their previous interview stays on the leaderboard. A new sign-in link is on its way.`
+          : `Invite sent to ${res.email}. They'll receive a one-time sign-in link by email.`,
       })
       setEmail('')
       setName('')
@@ -420,7 +423,10 @@ function CandidateLeaderboardSection({
             <span className="rank-number" role="cell">{candidate.rank ?? index + 1}</span>
             <div role="cell">
               <strong>{candidate.name}</strong>
-              <p>{candidate.email && candidate.email !== candidate.name ? candidate.email : `#${candidate.apiCandidateId}`}</p>
+              <p>
+                {candidate.email && candidate.email !== candidate.name ? candidate.email : `#${candidate.apiCandidateId}`}
+                {candidate.attempt ? ` - interview ${candidate.attempt} of ${candidate.attempts}` : ''}
+              </p>
             </div>
             <span className="score-pill" role="cell">{formatAggregate(candidate)}</span>
             <span className="tabout-pill" role="cell">{candidate.tabOuts}</span>
@@ -634,6 +640,20 @@ function CandidateDetailDrawer({ candidate, onClose }) {
   )
 }
 
+// Someone re-invited after finishing has several interviews (one row each). Number
+// them oldest-first so the recruiter can tell "Interview 1" from "Interview 2".
+function labelRepeatInterviews(list) {
+  const byEmail = {}
+  list.forEach((candidate) => {
+    (byEmail[candidate.email] ||= []).push(candidate)
+  })
+  return list.map((candidate) => {
+    const attempts = byEmail[candidate.email].slice().sort((a, b) => a.apiCandidateId - b.apiCandidateId)
+    if (attempts.length < 2) return candidate
+    return { ...candidate, attempt: attempts.indexOf(candidate) + 1, attempts: attempts.length }
+  })
+}
+
 function sortCandidates(list) {
   // Scored candidates high -> low, then everyone still waiting for the AI. The rank is
   // stored on each row so a filtered search still shows each candidate's true position.
@@ -693,7 +713,7 @@ export default function CompanyDashboard({ user, onBackToLanding, onOpenLogin, o
         for (const job of jobs) {
           const data = await listJobCandidates(job.job_id)
           const key = `JOB-${job.job_id}`
-          boards[key] = data.candidates.map((c) => mapLiveCandidate(c, job.title))
+          boards[key] = labelRepeatInterviews(data.candidates.map((c) => mapLiveCandidate(c, job.title)))
           liveList.push({
             jobId: key,
             apiJobId: job.job_id,

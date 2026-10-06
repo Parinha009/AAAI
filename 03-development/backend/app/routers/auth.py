@@ -40,7 +40,13 @@ def magic_link(payload: MagicLinkRequest, db: Session = Depends(get_db)) -> Magi
     recruiter = db.query(Recruiter).filter(func.lower(Recruiter.email) == email).first()
     candidate = None
     if recruiter is None:
-        candidate = db.query(Candidate).filter(func.lower(Candidate.email) == email).first()
+        # Newest interview first: a re-invited candidate signs in to their new interview.
+        candidate = (
+            db.query(Candidate)
+            .filter(func.lower(Candidate.email) == email)
+            .order_by(Candidate.candidate_id.desc())
+            .first()
+        )
 
     resp = MagicLinkResponse()  # generic — never reveals whether the email exists
 
@@ -84,6 +90,7 @@ def verify(payload: VerifyRequest, db: Session = Depends(get_db)) -> VerifyRespo
         candidate = (
             db.query(Candidate)
             .filter(func.lower(Candidate.email) == token.email, Candidate.job_id == token.job_id)
+            .order_by(Candidate.candidate_id.desc())
             .first()
         )
         if candidate is None:

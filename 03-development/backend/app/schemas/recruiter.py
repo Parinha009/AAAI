@@ -18,6 +18,8 @@ class InviteResponse(BaseModel):
     name: str | None = None
     candidate_status: str
     invite_sent: bool = True
+    # True when the email's previous interview was finished, so a new one was created.
+    new_interview: bool = False
     # Development-only helpers (hidden in production).
     dev_magic_link: str | None = None
     dev_token: str | None = None

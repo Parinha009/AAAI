@@ -6628,3 +6628,35 @@ img {
   gap: 12px;
   margin-top: 4px;
 }
+
+/* Landing: four-step workflow, compact hiring-project chips, preview legend */
+.workflow-grid.four {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.use-case-list.compact {
+  margin-top: 16px;
+}
+
+.use-case-list.compact span {
+  padding: 6px 12px;
+  font-size: 0.82rem;
+}
+
+.preview-legend {
+  margin: 10px 0 0;
+  font-size: 0.75rem;
+  color: var(--subtle);
+}
+
+@media (max-width: 1080px) {
+  .workflow-grid.four {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .workflow-grid.four {
+    grid-template-columns: 1fr;
+  }
+}

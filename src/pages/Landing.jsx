@@ -1,88 +1,90 @@
 import { useEffect, useRef, useState } from 'react'
 import Icon from '../components/Icon'
 
+// Every statement on this page describes what AAAI actually does today.
 const navItems = [
-  { id: 'workflow', label: 'How it works?' },
-  { id: 'pricing', label: 'Pricing' },
-  { id: 'resources', label: 'Resources' },
-  { id: 'use-cases', label: 'Use Cases' },
-  { id: 'contact-us', label: 'Contact Us' },
+  { id: 'how-it-works', label: 'How it works' },
+  { id: 'for-candidates', label: 'For candidates' },
+  { id: 'for-recruiters', label: 'For recruiters' },
+  { id: 'fairness', label: 'Fairness & privacy' },
 ]
-
-const navPanels = {
-  workflow: {
-    eyebrow: 'How it works',
-    title: 'How it works',
-    copy: 'Choose your path, confirm your account, and continue into the right workspace.',
-    items: ['Pick a role', 'Verify your email', 'Continue to your dashboard'],
-  },
-  pricing: {
-    eyebrow: 'Pricing',
-    title: 'Pricing',
-    copy: 'Start free and scale when your hiring workflow needs more capacity.',
-    items: ['Free to start', 'Scale when needed', 'No hidden setup fees'],
-  },
-  resources: {
-    eyebrow: 'Resources',
-    title: 'Resources',
-    copy: 'Guides, setup help, and support material live here.',
-    items: ['Compare Flowmingo', 'Blog', 'FAQ - Help Centre', 'Careers'],
-  },
-  'use-cases': {
-    eyebrow: 'Use cases',
-    title: 'Use Cases',
-    copy: 'Recruiters, hiring teams, and candidates can all use the same polished screening flow.',
-    items: ['For Candidates', 'View Sample Result', 'Take Demo Interview'],
-  },
-  'contact-us': {
-    eyebrow: 'Contact us',
-    title: 'Contact Us',
-    copy: 'Need help? Reach out and we can extend the flow for your team.',
-    items: ['Email support', 'Book a demo', 'Request onboarding help'],
-  },
-}
 
 const workflowSteps = [
   {
     count: '01',
     title: 'Invite',
-    copy: 'Send a polished interview link with structured expectations and a calm candidate entry point.',
+    copy: 'A recruiter invites a candidate by email to a hiring project. They sign in with a one-time link - no password.',
   },
   {
     count: '02',
-    title: 'Screen',
-    copy: 'Collect CV context, async answers, tab events, and completion status without clutter.',
+    title: 'Interview',
+    copy: 'After consent and a microphone check, the candidate answers questions out loud - 2 minutes each, drawn at random for every interview.',
   },
   {
     count: '03',
-    title: 'Shortlist',
-    copy: 'Review ranked scores, transcripts, recordings, and recruiter-ready summaries in one place.',
+    title: 'AI scoring',
+    copy: 'Whisper transcribes each answer; GPT-4o-mini scores technical skill, communication, problem solving and job fit (1-5) with a written rationale.',
+  },
+  {
+    count: '04',
+    title: 'Human review',
+    copy: 'Recruiters see a ranked leaderboard, read transcripts, play recordings and check review flags. A person makes the decision.',
   },
 ]
 
-const useCases = [
-  'Graduate hiring',
-  'High-volume screening',
-  'Remote candidate reviews',
-  'Structured interview prep',
+const candidatePoints = [
+  'Voice only - no camera, no video',
+  'Answer at a time that suits you',
+  '2 minutes per question, press Next when done',
+  'Microphone check before you start',
+  'Re-record an answer while you are on it',
+  'One-time email sign-in link',
+]
+
+const recruiterPoints = [
+  'Invite candidates by email',
+  'Ranked leaderboard per hiring project',
+  'Transcripts and playable recordings',
+  'Review flags with clear reasons',
+  'Tab-switch tracking and paste lock',
+  'Append-only audit trail of every AI call',
+]
+
+const hiringProjects = [
+  'Junior Backend Engineer',
+  'Senior Frontend Engineer',
+  'Full-Stack Engineer',
+  'QA Engineer',
+  'DevOps Engineer',
+  'Data Analyst',
+  'Mobile App Developer',
+  'UI/UX Designer',
+  'Product Manager',
+  'Machine Learning Engineer',
+  'Cybersecurity Analyst',
+  'IT Support Specialist',
 ]
 
 const roleOptions = [
   {
     id: 'company',
     title: 'Company / Recruiter',
-    description: 'Manage projects, candidates, scorecards, and interview signals.',
-    action: 'Continue as company',
+    description: 'Invite candidates and review their scores, transcripts and recordings.',
+    action: 'Continue as recruiter',
     icon: 'company',
   },
   {
     id: 'candidate',
-    title: 'Candidate / Job Seeker',
-    description: 'Open your profile, practice space, and interview workflow.',
+    title: 'Candidate',
+    description: 'Open the interview you were invited to.',
     action: 'Continue as candidate',
     icon: 'candidate',
   },
 ]
+
+const scrollToSection = (id) => {
+  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
 
 export default function Landing({
   currentUser,
@@ -95,25 +97,22 @@ export default function Landing({
   onLogout,
 }) {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [activePanel, setActivePanel] = useState('')
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
   const headerRef = useRef(null)
   const firstName = currentUser?.name?.split(' ')[0] || 'Account'
   const initial = firstName.charAt(0).toUpperCase()
-  const profileRoleLabel = currentRole === 'company' ? 'Company' : 'Candidate'
+  const profileRoleLabel = currentRole === 'company' ? 'Recruiter' : 'Candidate'
 
   useEffect(() => {
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') {
         setIsDialogOpen(false)
-        setActivePanel('')
         setIsProfileMenuOpen(false)
       }
     }
 
     const handlePointerDown = (event) => {
       if (headerRef.current && !headerRef.current.contains(event.target)) {
-        setActivePanel('')
         setIsProfileMenuOpen(false)
       }
     }
@@ -137,8 +136,6 @@ export default function Landing({
     onChooseCandidate()
   }
 
-  const panel = activePanel ? navPanels[activePanel] : null
-
   return (
     <main className="landing-page">
       <div className="landing-header-shell" ref={headerRef}>
@@ -146,10 +143,7 @@ export default function Landing({
           <button
             type="button"
             className="brand-button"
-            onClick={() => {
-              setActivePanel('')
-              window.scrollTo({ top: 0, behavior: 'smooth' })
-            }}
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
           >
             <img src="/logo.svg" alt="AAAI logo" className="brand-logo-small" />
             <span>AAAI</span>
@@ -157,14 +151,7 @@ export default function Landing({
 
           <nav className="nav-links" aria-label="Primary navigation">
             {navItems.map((item) => (
-              <button
-                type="button"
-                key={item.id}
-                className={activePanel === item.id ? 'nav-button active' : 'nav-button'}
-                aria-pressed={activePanel === item.id}
-                onMouseEnter={() => setActivePanel(item.id)}
-                onClick={() => setActivePanel((current) => (current === item.id ? '' : item.id))}
-              >
+              <button type="button" key={item.id} className="nav-button" onClick={() => scrollToSection(item.id)}>
                 {item.label}
               </button>
             ))}
@@ -179,15 +166,12 @@ export default function Landing({
                     className={isProfileMenuOpen ? 'landing-profile-chip active' : 'landing-profile-chip'}
                     aria-label={`Open profile menu for ${currentUser.name}`}
                     aria-expanded={isProfileMenuOpen}
-                    onClick={() => {
-                      setIsProfileMenuOpen((current) => !current)
-                      setActivePanel('')
-                    }}
+                    onClick={() => setIsProfileMenuOpen((current) => !current)}
                   >
                     <span className="avatar">{initial}</span>
                     <span className="landing-profile-copy">
                       <strong>{firstName}</strong>
-                      <small>{profileRoleLabel} - {currentUser.email}</small>
+                      <small>{profileRoleLabel}{currentUser.email ? ` - ${currentUser.email}` : ''}</small>
                     </span>
                     <Icon name="chevronDown" className="chevron-icon" size={18} />
                   </button>
@@ -212,8 +196,8 @@ export default function Landing({
                     </section>
                   ) : null}
                 </div>
-                <button type="button" className="solid-button small" onClick={() => setIsDialogOpen(true)}>
-                  <span>Get Started</span>
+                <button type="button" className="solid-button small" onClick={onGetStarted}>
+                  <span>Go to workspace</span>
                   <Icon name="arrowRight" />
                 </button>
               </>
@@ -233,21 +217,6 @@ export default function Landing({
             )}
           </div>
         </header>
-
-        {panel ? (
-          <section className="landing-mega-panel" aria-live="polite">
-            <p className="eyebrow">{panel.eyebrow}</p>
-            <h2>{panel.title}</h2>
-            <p>{panel.copy}</p>
-            <div className="mega-card-grid">
-              {panel.items.map((item) => (
-                <article className="mega-card" key={item}>
-                  {item}
-                </article>
-              ))}
-            </div>
-          </section>
-        ) : null}
       </div>
 
       <section className="landing-hero" aria-labelledby="hero-title">
@@ -261,87 +230,92 @@ export default function Landing({
           <span className="live-node live-node-three" />
         </div>
         <div className="hero-copy">
-          <p className="eyebrow">AI interview and CV screener</p>
-          <h1 id="hero-title">AI Interview &amp; CV Screener</h1>
+          <p className="eyebrow">Automated Asynchronous AI Interviewer</p>
+          <h1 id="hero-title">Spoken interviews, scored fairly and reviewed by people.</h1>
           <p>
-            AAAI turns async interviews into clear hiring signal with structured prompts, fairer review,
-            and a candidate experience that feels considered from the first click.
+            Candidates answer by voice, whenever suits them. AAAI transcribes every answer, scores it on four
+            clear traits with a written rationale, and gives recruiters a ranked shortlist - with the recordings
+            one click away.
           </p>
 
           <div className="hero-actions">
-            <button type="button" className="solid-button" onClick={() => setIsDialogOpen(true)}>
-              {currentUser ? 'Go to workspace' : 'Start free'}
-            </button>
-            {currentUser ? null : (
-              <button type="button" className="soft-button" onClick={onGoToSignup}>
-                Create account
+            {currentUser ? (
+              <button type="button" className="solid-button" onClick={onGetStarted}>
+                Go to workspace
+              </button>
+            ) : (
+              <button type="button" className="solid-button" onClick={() => setIsDialogOpen(true)}>
+                Get started
               </button>
             )}
+            <button type="button" className="soft-button" onClick={() => scrollToSection('how-it-works')}>
+              See how it works
+            </button>
           </div>
 
-          <dl className="hero-metrics" aria-label="Product highlights">
+          <dl className="hero-metrics" aria-label="How an interview works">
             <div>
-              <dt>Free</dt>
-              <dd>to launch</dd>
+              <dt>Voice</dt>
+              <dd>no video</dd>
             </div>
             <div>
-              <dt>24/7</dt>
-              <dd>async review</dd>
+              <dt>2:00</dt>
+              <dd>per question</dd>
             </div>
             <div>
-              <dt>Zero</dt>
-              <dd>setup fees</dd>
+              <dt>4 traits</dt>
+              <dd>scored 1-5</dd>
             </div>
           </dl>
         </div>
 
-        <div className="product-preview" aria-label="AAAI screening dashboard preview">
+        <div className="product-preview" aria-label="Example recruiter view">
           <div className="preview-topbar">
             <span className="preview-dot active" />
             <span className="preview-dot" />
             <span className="preview-dot" />
-            <span className="preview-status">Live shortlist</span>
+            <span className="preview-status">Example scorecard</span>
           </div>
           <div className="preview-grid">
             <section className="preview-panel preview-main">
               <div className="preview-panel-header">
-                <span>Candidate signal</span>
-                <strong>92</strong>
+                <span>Aggregate score</span>
+                <strong>17 / 20</strong>
               </div>
               <div className="signal-bars" aria-hidden="true">
-                <span style={{ height: '72%' }} />
-                <span style={{ height: '48%' }} />
-                <span style={{ height: '84%' }} />
-                <span style={{ height: '58%' }} />
-                <span style={{ height: '91%' }} />
+                <span style={{ height: '80%' }} title="Technical skill 4/5" />
+                <span style={{ height: '100%' }} title="Communication 5/5" />
+                <span style={{ height: '80%' }} title="Problem solving 4/5" />
+                <span style={{ height: '80%' }} title="Job fit 4/5" />
               </div>
+              <p className="preview-legend">Technical · Communication · Problem solving · Job fit</p>
             </section>
             <section className="preview-panel">
               <div className="preview-panel-header">
-                <span>Interview</span>
+                <span>Transcript</span>
                 <strong>Ready</strong>
               </div>
-              <p>Spoken answers transcribed and scored after a calm, structured interview.</p>
+              <p>Every answer transcribed, with the recording available to play back.</p>
             </section>
             <section className="preview-panel">
               <div className="preview-panel-header">
-                <span>CV match</span>
-                <strong>High</strong>
+                <span>Review flag</span>
+                <strong>Clear</strong>
               </div>
-              <p>Role fit, communication, and required skills summarized.</p>
+              <p>Low communication, frequent tab switches or a grading failure are flagged with the reason.</p>
             </section>
           </div>
         </div>
       </section>
 
-      <section className="section-band" id="workflow" aria-labelledby="workflow-title">
+      <section className="section-band" id="how-it-works" aria-labelledby="workflow-title">
         <div className="section-heading">
-          <p className="eyebrow">Workflow</p>
-          <h2 id="workflow-title">A quieter screening system with sharper outcomes.</h2>
-          <p>Each step removes operational noise so teams can spend more time on actual hiring judgment.</p>
+          <p className="eyebrow">How it works</p>
+          <h2 id="workflow-title">From invitation to shortlist in four steps.</h2>
+          <p>No scheduling, no live interviewer, and every candidate gets the same structured process.</p>
         </div>
 
-        <div className="workflow-grid">
+        <div className="workflow-grid four">
           {workflowSteps.map((step) => (
             <article className="workflow-card" key={step.count}>
               <span>{step.count}</span>
@@ -352,37 +326,69 @@ export default function Landing({
         </div>
       </section>
 
-      <section className="split-section" id="use-cases" aria-labelledby="use-cases-title">
+      <section className="split-section" id="for-candidates" aria-labelledby="candidates-title">
         <div>
-          <p className="eyebrow">Use cases</p>
-          <h2 id="use-cases-title">Designed for modern hiring rhythms.</h2>
+          <p className="eyebrow">For candidates</p>
+          <h2 id="candidates-title">A calm interview you can take on your own time.</h2>
           <p>
-            Use AAAI when you need consistent screening, respectful async interviews, and decision-ready
-            summaries without an overloaded recruiting stack.
+            Open the invitation email, sign in with one click, and answer each question out loud. Every interview
+            draws its own questions, so there is nothing to memorise - just speak naturally.
           </p>
         </div>
 
         <div className="use-case-list">
-          {useCases.map((item) => (
+          {candidatePoints.map((item) => (
             <span key={item}>{item}</span>
           ))}
         </div>
       </section>
 
-      <section className="pricing-section" id="pricing" aria-labelledby="pricing-title">
+      <section className="split-section" id="for-recruiters" aria-labelledby="recruiters-title">
+        <div>
+          <p className="eyebrow">For recruiters</p>
+          <h2 id="recruiters-title">Structured evidence for every candidate.</h2>
+          <p>
+            Pick a hiring project, invite candidates, and review a ranked leaderboard. Each project has its own
+            question bank and rubric - {hiringProjects.length} are ready to use:
+          </p>
+          <div className="use-case-list compact">
+            {hiringProjects.map((item) => (
+              <span key={item}>{item}</span>
+            ))}
+          </div>
+        </div>
+
+        <div className="use-case-list">
+          {recruiterPoints.map((item) => (
+            <span key={item}>{item}</span>
+          ))}
+        </div>
+      </section>
+
+      <section className="pricing-section" id="fairness" aria-labelledby="fairness-title">
         <div className="pricing-copy">
-          <p className="eyebrow">Pricing</p>
-          <h2 id="pricing-title">Start free. Scale only when the workflow earns it.</h2>
-          <p>No hidden setup fees, no bloated tiers, and no pressure to commit before your team has signal.</p>
+          <p className="eyebrow">Fairness &amp; privacy</p>
+          <h2 id="fairness-title">AI assists. People decide.</h2>
+          <p>
+            Every candidate is scored on the same four traits against a written rubric. Answers that sound
+            templated or scripted are flagged and their communication score is capped. Recordings are shared only with the hiring team, every AI request and
+            response is kept in an append-only audit log, and AI spending has a hard monthly cap.
+          </p>
         </div>
 
         <div className="pricing-card">
-          <span>Starter</span>
-          <strong>Free forever</strong>
-          <p>Launch async screening, invite candidates, and review core interview signals.</p>
-          <button type="button" className="solid-button" onClick={() => setIsDialogOpen(true)}>
-            Choose your path
-          </button>
+          <span>Ready when you are</span>
+          <strong>Invite-only access</strong>
+          <p>Recruiters sign in with their work email. Candidates join through the link in their invitation.</p>
+          {currentUser ? (
+            <button type="button" className="solid-button" onClick={onGetStarted}>
+              Go to workspace
+            </button>
+          ) : (
+            <button type="button" className="solid-button" onClick={() => setIsDialogOpen(true)}>
+              Choose your path
+            </button>
+          )}
         </div>
       </section>
 
@@ -391,7 +397,7 @@ export default function Landing({
           <img src="/logo.svg" alt="" className="footer-logo" />
           <span>AAAI</span>
         </div>
-        <p>Premium async screening for teams that care about speed, structure, and candidate experience.</p>
+        <p>Automated Asynchronous AI Interviewer - a university capstone project.</p>
       </footer>
 
       {isDialogOpen ? (

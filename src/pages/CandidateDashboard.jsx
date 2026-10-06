@@ -771,45 +771,134 @@ function InterviewWorkspace({ candidateName, resumeStage = 'base', onClose }) {
   )
 }
 
-function DashboardHeader({ title, copy }) {
-  return (
-    <header className="dashboard-section-header">
-      <h1>{title}</h1>
-      <p>{copy}</p>
-    </header>
-  )
-}
+// --- Candidate home: the interview journey ---------------------------------------
+// Everything here mirrors how the interview really works (FR-01/05/09/12/17).
 
-// What the candidate home shows for each server-side stage (FR-17 /interview/status).
-const STAGE_CARDS = {
+const JOURNEY_STEPS = [
+  { id: 'consent', title: 'Consent & mic check', detail: 'Agree to recording and check we can hear you', icon: 'shield' },
+  { id: 'base', title: 'Spoken questions', detail: '4 questions, one shared 5:00 timer', icon: 'mic' },
+  { id: 'follow_up', title: 'AI follow-up', detail: 'One question about your answers, 2:30', icon: 'spark' },
+  { id: 'review', title: 'Hiring team review', detail: 'People review your interview', icon: 'users' },
+]
+
+// Server stage -> which journey step is current, and what the hero says.
+const STAGE_VIEW = {
   consent: {
-    eyebrow: 'Invitation',
+    step: 0,
+    pill: 'Ready to start',
     title: 'Your AI interview is ready',
-    copy: 'Answer 3-5 questions out loud within one 5:00 timer, then one AI follow-up question (2:30).',
+    copy: 'Answer out loud, at your own pace within the timer. There is no live interviewer and no video - just your voice.',
     action: 'Start interview',
   },
   base: {
-    eyebrow: 'In progress',
-    title: 'Continue your interview',
-    copy: 'You started this interview earlier. Starting again shows the questions from the beginning.',
+    step: 1,
+    pill: 'In progress',
+    title: 'Pick up where you left off',
+    copy: 'You started this interview earlier. Your questions stay the same - they start again from the first one.',
     action: 'Continue interview',
   },
   follow_up: {
-    eyebrow: 'Almost done',
-    title: 'Answer your follow-up question',
-    copy: 'Your base answers are in. One AI follow-up question is waiting for you (2:30).',
+    step: 2,
+    pill: 'Almost done',
+    title: 'One last question is waiting',
+    copy: 'Your answers are in. One AI follow-up question based on what you said is waiting - you have 2:30 to answer.',
     action: 'Answer follow-up',
   },
   scoring: {
-    eyebrow: 'Submitted',
-    title: 'Your interview is being reviewed',
-    copy: 'All your answers were received. The hiring team will review them and contact you.',
+    step: 3,
+    pill: 'Submitted',
+    title: 'Your interview is with the hiring team',
+    copy: 'All your answers were received. They are being transcribed and reviewed - the hiring team will contact you about next steps.',
   },
   completed: {
-    eyebrow: 'Complete',
-    title: 'Interview complete - thank you',
-    copy: 'All your answers were received. The hiring team will review them and contact you.',
+    step: 4,
+    pill: 'Complete',
+    title: 'Interview complete - thank you!',
+    copy: 'All your answers were received. The hiring team reviews every interview and will contact you about next steps.',
   },
+}
+
+const BEFORE_YOU_START = [
+  { icon: 'mic', title: 'Find a quiet spot', text: 'Background noise makes your answers harder to understand. A headset helps.' },
+  { icon: 'shield', title: 'Allow the microphone', text: "When your browser asks, choose Allow. You'll see a level bar move as you speak." },
+  { icon: 'flag', title: 'Stay on this tab', text: 'Switching tabs during a question is noted for the hiring team. Pasting is turned off.' },
+  { icon: 'spark', title: 'Speak naturally', text: 'Real examples beat perfect wording. Short pauses and corrections are completely fine.' },
+]
+
+const GOOD_TO_KNOW = [
+  {
+    q: 'Can I re-record an answer?',
+    a: 'Yes. While you are on a question you can press "Record again" as many times as you like - your latest take is the one that counts. The shared 5:00 timer keeps running, so keep an eye on it.',
+  },
+  {
+    q: "What if my microphone doesn't work?",
+    a: 'The microphone check before you start shows a live level bar. If it stays flat, pick another microphone from the list, or allow access via the lock icon next to the address bar.',
+  },
+  {
+    q: 'Who sees my answers?',
+    a: 'Only the hiring team for this job. Your answers are transcribed and an AI suggests scores; the hiring team can listen to your recordings, and a person makes the final decision.',
+  },
+  {
+    q: 'What if I close the tab or lose my connection?',
+    a: 'Come back to this page and press "Continue interview". If you had already answered the main questions, you go straight to the follow-up.',
+  },
+  {
+    q: 'My sign-in link stopped working',
+    a: 'Each link works once and expires after 15 minutes. Use "Request a new sign-in link" with the same email address to get a fresh one.',
+  },
+]
+
+function ProgressRing({ step, total }) {
+  const radius = 44
+  const circumference = 2 * Math.PI * radius
+  const done = Math.min(step, total)
+  const offset = circumference * (1 - done / total)
+  return (
+    <div className="cj-ring" role="img" aria-label={`Step ${Math.min(step + 1, total)} of ${total}`}>
+      <svg viewBox="0 0 110 110" aria-hidden="true">
+        <circle className="cj-ring-track" cx="55" cy="55" r={radius} />
+        <circle
+          className="cj-ring-value"
+          cx="55"
+          cy="55"
+          r={radius}
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+        />
+      </svg>
+      <div className="cj-ring-label">
+        {step >= total ? (
+          <Icon name="check" size={30} />
+        ) : (
+          <>
+            <strong>{step + 1}</strong>
+            <span>of {total}</span>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function JourneySteps({ current }) {
+  return (
+    <ol className="cj-steps" aria-label="Interview steps">
+      {JOURNEY_STEPS.map((item, index) => {
+        const state = index < current ? 'done' : index === current ? 'current' : 'upcoming'
+        return (
+          <li className={`cj-step ${state}`} key={item.id} aria-current={state === 'current' ? 'step' : undefined}>
+            <span className="cj-step-icon" aria-hidden="true">
+              <Icon name={state === 'done' ? 'check' : item.icon} size={18} />
+            </span>
+            <div>
+              <strong>{item.title}</strong>
+              <p>{item.detail}</p>
+            </div>
+          </li>
+        )
+      })}
+    </ol>
+  )
 }
 
 export default function CandidateDashboard({ user, onOpenLogin, onBackToLanding, onLogout }) {
@@ -818,8 +907,9 @@ export default function CandidateDashboard({ user, onOpenLogin, onBackToLanding,
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
   const profile = user || { name: 'Candidate', email: '' }
-  const firstName = profile.name.split(' ')[0] || 'Candidate'
-  const initial = firstName.charAt(0).toUpperCase()
+  const firstName = profile.name.split(/[ .+_-]/)[0] || 'Candidate'
+  const displayName = firstName.charAt(0).toUpperCase() + firstName.slice(1)
+  const initial = displayName.charAt(0)
   const signedIn = hasSession()
 
   useEffect(() => {
@@ -848,62 +938,76 @@ export default function CandidateDashboard({ user, onOpenLogin, onBackToLanding,
   }, [])
 
   const stage = interview.status?.stage
-  const card = STAGE_CARDS[stage === 'processing' ? 'base' : stage] || null
+  // 'processing' = all questions answered, follow-up still being prepared: resume there.
+  const view = STAGE_VIEW[stage === 'processing' ? 'follow_up' : stage] || null
+  const finished = view && view.step >= 3
 
-  const renderInterviewCard = () => {
+  const renderHero = () => {
     if (!signedIn) {
       return (
-        <section className="dashboard-card">
-          <p className="eyebrow">Sign in required</p>
-          <h2>Open your invitation email</h2>
-          <p>Your interview link arrives by email from the hiring team. Click <strong>Sign in</strong> in that email to begin.</p>
-          <button type="button" className="solid-button" onClick={onOpenLogin}>Request a new sign-in link</button>
+        <section className="cj-hero">
+          <div className="cj-hero-copy">
+            <span className="cj-pill neutral">Sign in required</span>
+            <h1>Open your invitation email</h1>
+            <p>Your interview link arrives by email from the hiring team. Click <strong>Sign in</strong> in that email to begin.</p>
+            <div className="cj-hero-actions">
+              <button type="button" className="solid-button" onClick={onOpenLogin}>Request a new sign-in link</button>
+            </div>
+          </div>
         </section>
       )
     }
     if (interview.loading) {
-      return <section className="dashboard-card"><p>Loading your interview...</p></section>
-    }
-    if (interview.error) {
       return (
-        <section className="dashboard-card">
-          <p className="eyebrow">Something went wrong</p>
-          <h2>We couldn&apos;t load your interview</h2>
-          <p>{interview.error}</p>
-          <button type="button" className="solid-button" onClick={() => setReloadKey((key) => key + 1)}>Try again</button>
+        <section className="cj-hero" aria-busy="true">
+          <div className="cj-hero-copy">
+            <span className="cj-skeleton short" />
+            <span className="cj-skeleton title" />
+            <span className="cj-skeleton" />
+          </div>
         </section>
       )
     }
-    if (!card) {
-      return <section className="dashboard-card"><p>No interview found for this account.</p></section>
+    if (interview.error || !view) {
+      return (
+        <section className="cj-hero">
+          <div className="cj-hero-copy">
+            <span className="cj-pill warning">Something went wrong</span>
+            <h1>We couldn&apos;t load your interview</h1>
+            <p>{interview.error || 'No interview was found for this account.'}</p>
+            <div className="cj-hero-actions">
+              <button type="button" className="solid-button" onClick={() => setReloadKey((key) => key + 1)}>Try again</button>
+            </div>
+          </div>
+        </section>
+      )
     }
     return (
-      <section className="intro-panel">
-        <div className="intro-panel-main">
-          <div className="intro-kicker-row">
-            <span>{card.eyebrow}</span>
-          </div>
-          <h2>{card.title}</h2>
-          <p>{card.copy}</p>
-          {card.action ? (
-            <>
-              <ul>
-                <li><strong>Find a quiet room</strong> and allow microphone access when your browser asks</li>
-                <li><strong>Stay on this tab</strong> - switching tabs is recorded for the hiring team</li>
-                <li><strong>Speak naturally</strong> - your answers are transcribed and reviewed with AI assistance</li>
-              </ul>
-              <button type="button" className="solid-button" onClick={() => setIsInterviewOpen(true)}>
-                {card.action}
+      <section className={finished ? 'cj-hero finished' : 'cj-hero'}>
+        <div className="cj-hero-copy">
+          <p className="cj-greeting">Hi {displayName},</p>
+          <span className={finished ? 'cj-pill success' : 'cj-pill'}>{view.pill}</span>
+          <h1>{view.title}</h1>
+          <p>{view.copy}</p>
+          {view.action ? (
+            <div className="cj-hero-actions">
+              <button type="button" className="solid-button cj-start" onClick={() => setIsInterviewOpen(true)}>
+                {view.action}
+                <Icon name="arrowRight" size={18} />
               </button>
-            </>
+              <span className="cj-meta">
+                <Icon name="clock" size={16} /> About 10 minutes
+              </span>
+            </div>
           ) : null}
         </div>
+        <ProgressRing step={view.step} total={JOURNEY_STEPS.length} />
       </section>
     )
   }
 
   return (
-    <main className="candidate-app-page">
+    <main className="candidate-app-page cj-page">
       <header className="dashboard-topbar">
         <button type="button" className="dashboard-brand" onClick={onBackToLanding}>
           <img src="/logo.svg" alt="AAAI logo" />
@@ -920,7 +1024,7 @@ export default function CandidateDashboard({ user, onOpenLogin, onBackToLanding,
               onClick={() => setIsProfileOpen((current) => !current)}
             >
               <span className="avatar">{initial}</span>
-              <strong>{firstName}</strong>
+              <strong>{displayName}</strong>
               <Icon name="chevronDown" className="chevron-icon" />
             </button>
             {isProfileOpen ? (
@@ -928,7 +1032,7 @@ export default function CandidateDashboard({ user, onOpenLogin, onBackToLanding,
                 <div className="profile-menu-head">
                   <span className="avatar large-avatar">{initial}</span>
                   <div>
-                    <strong>{firstName}</strong>
+                    <strong>{displayName}</strong>
                     <p>{profile.email}</p>
                   </div>
                 </div>
@@ -959,32 +1063,73 @@ export default function CandidateDashboard({ user, onOpenLogin, onBackToLanding,
         </div>
       </header>
 
-      <div className="dashboard-layout">
-        <aside className="dashboard-sidebar">
-          <h2>Welcome, {firstName}!</h2>
-          <nav className="dashboard-nav" aria-label="Candidate sections">
-            <button type="button" className="dashboard-nav-item active">
-              <span className="nav-glyph" aria-hidden="true">
-                <Icon name="mic" />
-              </span>
-              My interview
-            </button>
-          </nav>
-        </aside>
+      <div className="cj-shell">
+        {renderHero()}
 
-        <section className="dashboard-content">
-          <DashboardHeader title="My interview" copy="Your invited AI interview and its current status." />
-          {renderInterviewCard()}
+        {view ? (
+          <section className="cj-section" aria-labelledby="cj-steps-title">
+            <h2 id="cj-steps-title">How your interview works</h2>
+            <JourneySteps current={view.step} />
+          </section>
+        ) : null}
+
+        {view && !finished ? (
+          <section className="cj-section" aria-labelledby="cj-tips-title">
+            <h2 id="cj-tips-title">Before you start</h2>
+            <div className="cj-tips">
+              {BEFORE_YOU_START.map((tip) => (
+                <article className="cj-tip" key={tip.title}>
+                  <span className="cj-tip-icon" aria-hidden="true">
+                    <Icon name={tip.icon} size={20} />
+                  </span>
+                  <h3>{tip.title}</h3>
+                  <p>{tip.text}</p>
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {finished ? (
+          <section className="cj-section cj-next" aria-labelledby="cj-next-title">
+            <span className="cj-tip-icon" aria-hidden="true">
+              <Icon name="award" size={22} />
+            </span>
+            <div>
+              <h2 id="cj-next-title">What happens next</h2>
+              <p>
+                The hiring team reviews your answers with an AI-assisted summary and can listen to your
+                recordings. A person makes the final decision, and they will contact you by email - there is
+                nothing else you need to do here.
+              </p>
+            </div>
+          </section>
+        ) : null}
+
+        <section className="cj-section" aria-labelledby="cj-faq-title">
+          <h2 id="cj-faq-title">Good to know</h2>
+          <div className="cj-faq">
+            {GOOD_TO_KNOW.map((item) => (
+              <details key={item.q}>
+                <summary>{item.q}</summary>
+                <p>{item.a}</p>
+              </details>
+            ))}
+          </div>
         </section>
+
+        <p className="cj-privacy">
+          <Icon name="shield" size={16} /> Your recordings are only shared with the hiring team for this job.
+        </p>
       </div>
 
       {isInterviewOpen ? (
         <InterviewWorkspace
-          candidateName={firstName}
-          resumeStage={stage === 'follow_up' ? 'follow_up' : 'base'}
+          candidateName={displayName}
+          resumeStage={stage === 'follow_up' || stage === 'processing' ? 'follow_up' : 'base'}
           onClose={() => {
             setIsInterviewOpen(false)
-            setReloadKey((key) => key + 1) // refresh the status card
+            setReloadKey((key) => key + 1) // refresh the journey
           }}
         />
       ) : null}

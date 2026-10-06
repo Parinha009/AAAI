@@ -285,4 +285,13 @@ def interview_status(
         return out("scoring", "await_score")
     if pipeline.follow_up_question(db, candidate.candidate_id):
         return out("follow_up", "answer_follow_up")
+    # Every question of this interview answered, follow-up not generated yet (e.g. the
+    # tab closed during the processing pause): resume at the follow-up, not from scratch.
+    assigned = set(candidate.assigned_questions or [])
+    answered = {
+        r.question_id
+        for r in db.query(Response).filter(Response.candidate_id == candidate.candidate_id, Response.type == "base")
+    }
+    if assigned and assigned <= answered:
+        return out("processing", "await_follow_up")
     return out("base", "answer_base")

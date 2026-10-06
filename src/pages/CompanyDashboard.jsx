@@ -139,6 +139,7 @@ function mapLiveCandidate(c, jobTitle) {
     live: true,
     scored,
     name: c.name || c.email,
+    email: c.email,
     role: jobTitle,
     aggregateScore: scored ? c.aggregate_score : 0,
     maxScore: 20,
@@ -160,6 +161,31 @@ function mapLiveCandidate(c, jobTitle) {
 }
 
 // GET /candidates/{id} -> the shape the detail drawer renders.
+// Everything a recruiter might type to find a candidate: name, email, #id, status,
+// score, review reasons (codes and readable text) and progress.
+function candidateSearchText(candidate) {
+  return [
+    candidate.name,
+    candidate.email,
+    `#${candidate.apiCandidateId}`,
+    candidate.role,
+    candidate.status,
+    candidate.confidence,
+    candidate.completedAt,
+    candidate.scored ? `${candidate.aggregateScore}/${candidate.maxScore} ${candidate.aggregateScore}` : 'not scored',
+    ...candidate.reviewReasons,
+    ...candidate.reviewReasons.map(formatReviewReason),
+  ].filter(Boolean).join(' ').toLowerCase()
+}
+
+// Every word must match somewhere (so "dara review" finds Dara if she is flagged).
+function matchesSearch(candidate, query) {
+  const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
+  if (!terms.length) return true
+  const text = candidateSearchText(candidate)
+  return terms.every((term) => text.includes(term))
+}
+
 function mapLiveDetail(base, detail, audit) {
   const rationale = detail.score?.rationale || {}
   return {
@@ -331,7 +357,11 @@ function InviteCandidatePanel({ onInvited }) {
   )
 }
 
-function CandidateLeaderboardSection({ project, projects, rankedCandidates, selectedJobId, onJobChange, onReviewCandidate, onInvited }) {
+function CandidateLeaderboardSection({
+  project, projects, rankedCandidates, selectedJobId, onJobChange, onReviewCandidate, onInvited,
+  searchQuery = '', totalCount = rankedCandidates.length, onClearSearch,
+}) {
+  const query = searchQuery.trim()
   return (
     <section className="recruiter-scoreboard">
       <header className="scoreboard-header">
@@ -365,7 +395,14 @@ function CandidateLeaderboardSection({ project, projects, rankedCandidates, sele
             ))}
           </select>
         </label>
-        <span><strong>{rankedCandidates.length}</strong> candidates for {project.title}</span>
+        {query ? (
+          <span className="search-summary">
+            <strong>{rankedCandidates.length}</strong> of {totalCount} match &ldquo;{query}&rdquo;
+            <button type="button" className="text-link" onClick={onClearSearch}>Clear search</button>
+          </span>
+        ) : (
+          <span><strong>{totalCount}</strong> candidates for {project.title}</span>
+        )}
       </div>
 
       <div className="leaderboard-table" role="table" aria-label="Ranked candidate leaderboard">
@@ -380,10 +417,10 @@ function CandidateLeaderboardSection({ project, projects, rankedCandidates, sele
         </div>
         {rankedCandidates.map((candidate, index) => (
           <article className={candidate.review ? 'leaderboard-row flagged' : 'leaderboard-row'} role="row" key={candidate.id}>
-            <span className="rank-number" role="cell">{index + 1}</span>
+            <span className="rank-number" role="cell">{candidate.rank ?? index + 1}</span>
             <div role="cell">
               <strong>{candidate.name}</strong>
-              <p>{candidate.role}</p>
+              <p>{candidate.email && candidate.email !== candidate.name ? candidate.email : `#${candidate.apiCandidateId}`}</p>
             </div>
             <span className="score-pill" role="cell">{formatAggregate(candidate)}</span>
             <span className="tabout-pill" role="cell">{candidate.tabOuts}</span>
@@ -399,7 +436,12 @@ function CandidateLeaderboardSection({ project, projects, rankedCandidates, sele
         ))}
         {!rankedCandidates.length ? (
           <div className="leaderboard-empty" role="row">
-            No candidates yet - invite one above, or clear the search.
+            {query ? (
+              <>
+                No candidates match &ldquo;{query}&rdquo;.{' '}
+                <button type="button" className="text-link" onClick={onClearSearch}>Clear search</button>
+              </>
+            ) : 'No candidates yet - invite one above.'}
           </div>
         ) : null}
       </div>
@@ -593,9 +635,12 @@ function CandidateDetailDrawer({ candidate, onClose }) {
 }
 
 function sortCandidates(list) {
-  // Scored candidates high -> low, then everyone still waiting for the AI.
-  return [...list].sort((first, second) => (second.scored === false ? -1 : second.aggregateScore)
-    - (first.scored === false ? -1 : first.aggregateScore))
+  // Scored candidates high -> low, then everyone still waiting for the AI. The rank is
+  // stored on each row so a filtered search still shows each candidate's true position.
+  return [...list]
+    .sort((first, second) => (second.scored === false ? -1 : second.aggregateScore)
+      - (first.scored === false ? -1 : first.aggregateScore))
+    .map((candidate, index) => ({ ...candidate, rank: index + 1 }))
 }
 
 export default function CompanyDashboard({ user, onBackToLanding, onOpenLogin, onLogout }) {
@@ -614,16 +659,7 @@ export default function CompanyDashboard({ user, onBackToLanding, onOpenLogin, o
   const initial = (profile.name || 'R').charAt(0).toUpperCase()
   const project = liveProjects.find((item) => item.jobId === selectedJobId) || liveProjects[0] || null
   const rankedCandidates = project ? sortCandidates(liveLeaderboards[project.jobId] || []) : []
-  const normalizedSearch = searchQuery.trim().toLowerCase()
-  const searchedCandidates = normalizedSearch
-    ? rankedCandidates.filter((candidate) => [
-      candidate.name,
-      candidate.role,
-      candidate.status,
-      candidate.confidence,
-      ...candidate.reviewReasons.map(formatReviewReason),
-    ].some((value) => value.toLowerCase().includes(normalizedSearch)))
-    : rankedCandidates
+  const searchedCandidates = rankedCandidates.filter((candidate) => matchesSearch(candidate, searchQuery))
   const scoredCount = rankedCandidates.filter((candidate) => candidate.scored).length
   const needsReviewCount = rankedCandidates.filter((candidate) => candidate.review).length
   const totalTabOuts = rankedCandidates.reduce((sum, candidate) => sum + candidate.tabOuts, 0)
@@ -701,6 +737,13 @@ export default function CompanyDashboard({ user, onBackToLanding, onOpenLogin, o
   }, [signedIn])
 
   const refresh = () => setReloadKey((key) => key + 1)
+
+  const handleSearchChange = (value) => {
+    setSearchQuery(value)
+    if (value.trim() && activeInterviewPage !== 'candidates') {
+      setActiveInterviewPage('candidates')
+    }
+  }
 
   const handleReviewCandidate = async (candidate) => {
     if (!candidate) {
@@ -831,6 +874,9 @@ export default function CompanyDashboard({ user, onBackToLanding, onOpenLogin, o
             onJobChange={handleJobChange}
             onReviewCandidate={handleReviewCandidate}
             onInvited={refresh}
+            searchQuery={searchQuery}
+            totalCount={rankedCandidates.length}
+            onClearSearch={() => setSearchQuery('')}
           />
         ) : null}
       </>
@@ -928,9 +974,16 @@ export default function CompanyDashboard({ user, onBackToLanding, onOpenLogin, o
                 <input
                   id="companySearch"
                   type="search"
-                  placeholder="Search candidates"
+                  placeholder="Search name, email, #id, status, score"
+                  aria-label="Search candidates"
                   value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
+                  onChange={(event) => handleSearchChange(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Escape') {
+                      event.stopPropagation()
+                      setSearchQuery('')
+                    }
+                  }}
                 />
               </label>
               <button type="button" className="company-secondary-button compact" onClick={refresh} disabled={loadState.loading}>

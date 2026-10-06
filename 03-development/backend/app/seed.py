@@ -156,7 +156,7 @@ DEMO_RUBRIC = {
 }
 
 
-QUESTIONS_PER_INTERVIEW = 4  # drawn at random per interview from each job's bank (FR-05)
+QUESTIONS_PER_INTERVIEW = 5  # drawn at random per interview from each job's bank (FR-05)
 
 
 def _backend_rubric() -> dict:

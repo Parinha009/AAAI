@@ -57,7 +57,6 @@ class Settings(BaseSettings):
 
     # "Interview Physics" — fixed product constants (SRS-2.5), not user settings.
     base_round_seconds: int = 300  # 5:00 base round (FR-05)
-    follow_up_seconds: int = 150  # 2:30 follow-up (FR-09)
     processing_pause_seconds: int = 15  # 15s async processing pause (FR-17)
 
     # Audio upload (SRS-FR-06).

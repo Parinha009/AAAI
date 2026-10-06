@@ -1,7 +1,7 @@
 """Per-interview question draw (FR-05).
 
 Each job stores a *bank* of questions in `jobs.base_questions`. Every interview gets
-its own random set from that bank, so two candidates - or the same person
+its own random set (5 questions) from that bank, so two candidates - or the same person
 interviewing again - don't get the same questions:
 
 - one question per trait first (technical_skill, communication, problem_solving,
@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Candidate, Job, Response
 
-DEFAULT_PER_INTERVIEW = 4
+DEFAULT_PER_INTERVIEW = 5
 MIN_PER_INTERVIEW, MAX_PER_INTERVIEW = 3, 5  # SRS FR-05: 3-5 base questions
 
 _rng = random.SystemRandom()

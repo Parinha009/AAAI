@@ -1,7 +1,7 @@
 """Interview flow routes (API Contract v1 §3.3).
 
 consent (FR-01), base questions (FR-05), audio upload (FR-02/06), transcription
-poll (FR-07/17), follow-up (FR-08), tab-out (FR-12), screen-flow status (FR-17).
+poll (FR-07/17), finish, tab-out (FR-12), screen-flow status (FR-17).
 The AI work itself runs in background tasks - see app/pipeline.py.
 """
 
@@ -11,7 +11,6 @@ from pathlib import Path
 from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Request, UploadFile, status
-from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app import pipeline
@@ -23,7 +22,7 @@ from app.models import AuditLog, Candidate, Job, Response
 from app.schemas.interview import (
     ConsentRequest,
     ConsentResponse,
-    FollowUpQuestion,
+    FinishResponse,
     InterviewStatusResponse,
     Question,
     QuestionsResponse,
@@ -115,8 +114,8 @@ def upload_response(
     request: Request,
     background_tasks: BackgroundTasks,
     audio: UploadFile = File(..., description="Recorded audio (webm/mp4/wav/m4a, <=20 MB)"),
-    question_id: int = Form(..., description="0 for the follow-up"),
-    type: str = Form(..., description="'base' or 'follow_up'"),
+    question_id: int = Form(..., description="Which of this interview's questions"),
+    type: str = Form(..., description="'base' (follow-up questions are no longer used)"),
     candidate: Candidate = Depends(require_consent),
     db: Session = Depends(get_db),
 ) -> UploadResponse:
@@ -125,11 +124,11 @@ def upload_response(
         raise api_error(413, "PAYLOAD_TOO_LARGE", "Audio file exceeds the 20 MB limit",
                         {"max_bytes": settings.max_upload_bytes})
 
-    if type not in ("base", "follow_up"):
-        raise api_error(422, "VALIDATION_ERROR", "type must be 'base' or 'follow_up'")
-    if type == "follow_up":
-        question_id = 0  # contract: the follow-up is always question 0
-    elif question_id not in {q["question_id"] for q in assigned_questions(db, candidate)}:
+    if candidate.status in ("completed", "expired"):
+        raise api_error(409, "CONFLICT", "This interview has already been submitted")
+    if type != "base":
+        raise api_error(422, "VALIDATION_ERROR", "type must be 'base' - there is no follow-up question")
+    if question_id not in {q["question_id"] for q in assigned_questions(db, candidate)}:
         raise api_error(422, "VALIDATION_ERROR", "That question is not part of this interview",
                         {"field": "question_id"})
 
@@ -215,25 +214,26 @@ def response_status(
     )
 
 
-# --- Follow-up question (FR-08) — 202 while generating, 200 when ready -----
-@router.get(
-    "/follow-up",
-    response_model=FollowUpQuestion,
-    responses={202: {"description": "Still generating - poll again"}},
-    summary="Get the one AI follow-up question (FR-08)",
+# --- Finish the interview -> scoring -------------------------------------
+@router.post(
+    "/finish",
+    response_model=FinishResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Submit the interview; AI scoring runs once every answer is transcribed",
 )
-def follow_up(
+def finish(
     background_tasks: BackgroundTasks,
     candidate: Candidate = Depends(require_consent),
     db: Session = Depends(get_db),
-):
-    question = pipeline.follow_up_question(db, candidate.candidate_id)
-    if question:
-        return FollowUpQuestion(text=question, follow_up_seconds=settings.follow_up_seconds)
-    # Generate only once every base answer is transcribed; until then keep polling.
-    if not pipeline.base_pending(db, candidate.candidate_id):
-        background_tasks.add_task(pipeline.generate_follow_up, candidate.candidate_id)
-    return JSONResponse(status_code=status.HTTP_202_ACCEPTED, content={"status": "generating"})
+) -> FinishResponse:
+    """Called after the last answer (or when the 5:00 timer ends). Marks the interview
+    completed - no more uploads - and starts scoring as soon as transcription is done.
+    Idempotent: finishing twice is harmless."""
+    if candidate.status != "completed":
+        candidate.status = "completed"
+        db.commit()
+    background_tasks.add_task(pipeline.maybe_score, candidate.candidate_id)
+    return FinishResponse(candidate_status=candidate.status)
 
 
 # --- Tab-out (FR-12) — fire-and-forget, must not block recording ---------
@@ -276,13 +276,4 @@ def interview_status(
         return out("consent", "show_consent")
     if candidate.status in ("completed", "expired"):
         return out("completed", "show_complete")
-    answered_follow_up = (
-        db.query(Response)
-        .filter(Response.candidate_id == candidate.candidate_id, Response.type == "follow_up")
-        .first()
-    )
-    if answered_follow_up is not None:
-        return out("scoring", "await_score")
-    if pipeline.follow_up_question(db, candidate.candidate_id):
-        return out("follow_up", "answer_follow_up")
     return out("base", "answer_base")

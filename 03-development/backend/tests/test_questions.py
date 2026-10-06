@@ -23,18 +23,18 @@ def test_draw_is_balanced_and_random():
     bank = _bank()
     seen_sets = set()
     for seed in range(40):
-        picks = questions.draw(bank, 4, rng=random.Random(seed))
-        assert len(picks) == 4
-        assert sorted(q["trait"] for q in picks) == sorted(TRAITS)  # one per trait
+        picks = questions.draw(bank, 5, rng=random.Random(seed))
+        assert len(picks) == 5
+        assert {q["trait"] for q in picks} == set(TRAITS)  # every trait covered
         seen_sets.add(tuple(sorted(q["question_id"] for q in picks)))
     assert len(seen_sets) > 10  # interviews really do differ
 
 
 def test_draw_avoids_previous_questions_when_possible():
     bank = _bank()
-    first = questions.draw(bank, 4, rng=random.Random(1))
+    first = questions.draw(bank, 5, rng=random.Random(1))
     avoid = {q["question_id"] for q in first}
-    second = questions.draw(bank, 4, avoid, rng=random.Random(2))
+    second = questions.draw(bank, 5, avoid, rng=random.Random(2))
     assert not avoid & {q["question_id"] for q in second}
     # a bank too small to avoid repeats still gives a full set
     small = _bank(n_per_trait=1)
@@ -44,7 +44,7 @@ def test_draw_avoids_previous_questions_when_possible():
 def _job_with_bank():
     db = SessionLocal()
     try:
-        job = Job(title=f"Bank job {uuid.uuid4().hex[:6]}", rubric_config={"questions_per_interview": 4},
+        job = Job(title=f"Bank job {uuid.uuid4().hex[:6]}", rubric_config={"questions_per_interview": 5},
                   base_questions=_bank())
         db.add(job)
         db.commit()
@@ -74,7 +74,7 @@ def test_interview_gets_saved_random_draw(client, login):
     consent(client, h)
 
     first = client.get(f"{API}/interview/questions", headers=h).json()["questions"]
-    assert len(first) == 4
+    assert len(first) == 5
     assert client.get(f"{API}/interview/questions", headers=h).json()["questions"] == first  # stable on refresh
 
     traits = {q["question_id"] // 10 for q in first}
@@ -107,4 +107,4 @@ def test_reinterview_gets_new_questions(client, login):
     h2 = {"Authorization": f"Bearer {login(email)}"}
     consent(client, h2)
     second = {q["question_id"] for q in client.get(f"{API}/interview/questions", headers=h2).json()["questions"]}
-    assert len(second) == 4 and not first & second  # no repeats for the same person
+    assert len(second) == 5 and not first & second  # no repeats for the same person

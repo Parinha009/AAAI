@@ -573,7 +573,7 @@ function CandidateDetailDrawer({ candidate, onClose }) {
           <p className="invite-note">
             {candidate.reviewReasons?.includes('GRADING_FAILED')
               ? 'AI grading failed twice - listen to the recordings and score by hand.'
-              : 'Not scored yet - scoring runs once the follow-up answer is transcribed.'}
+              : 'Not scored yet - scoring runs once the candidate submits and every answer is transcribed.'}
           </p>
         ) : null}
 
@@ -851,7 +851,7 @@ export default function CompanyDashboard({
               <span>
                 Estimated spend ${Number(budget.estimated_spend_usd).toFixed(2)} has reached the
                 ${Number(budget.ceiling_usd).toFixed(2)} monthly ceiling ({budget.month}). Interviews are still
-                recorded, but transcription, follow-ups and scoring are paused until next month.
+                recorded, but transcription and scoring are paused until next month.
               </span>
             </div>
           </div>

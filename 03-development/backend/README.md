@@ -88,7 +88,7 @@ python -m app.seed   # the Lead's job + rubric, plus logins (see below)
 *Junior Backend Engineer*, plus *Senior Frontend*, *Full-Stack*, *QA*, *DevOps*, *Data Analyst*,
 *Mobile App Developer*, *UI/UX Designer*, *Product Manager*, *Machine Learning Engineer*,
 *Cybersecurity Analyst* and *IT Support Specialist* ([app/seed_jobs.py](app/seed_jobs.py)). Each has a **bank of 12 questions** (3 per
-trait). Every interview draws **4 at random — one per trait — in random order**
+trait). Every interview draws **5 at random — every trait covered, then one extra — in random order**
 ([app/questions.py](app/questions.py)), avoids questions that email already answered, and
 saves the draw in `candidates.assigned_questions` (migration `0003`) so a refresh shows the
 same set. `GET /interview/questions` keeps its contract shape; uploads for a question the
@@ -111,7 +111,7 @@ candidates are seeded; every score comes from the AI pipeline.
 | GET | `/api/v1/interview/questions` | Base questions + 5:00 timer (FR-05); **403 until consent** | Bearer + consent |
 | POST | `/api/v1/interview/responses` | Upload one answer — 20 MB cap, type allow-list (FR-02/06) → 201 | Bearer + consent |
 | GET | `/api/v1/interview/responses/{id}` | Poll transcription status (FR-07/17) | Bearer + consent |
-| GET | `/api/v1/interview/follow-up` | The one AI follow-up — 202 while generating, 200 when ready (FR-08) | Bearer + consent |
+| POST | `/api/v1/interview/finish` | **v1.1:** submit the interview → `completed`; scoring runs once every answer is transcribed (replaces the follow-up) | Bearer + consent |
 | POST | `/api/v1/interview/events/tab-out` | Log a tab-switch (FR-12) → 202 | Bearer (candidate) |
 | GET | `/api/v1/interview/status` | Screen-flow driver (FR-17) | Bearer (candidate) |
 | GET | `/api/v1/system/budget-status` | AI spend vs the $10 cap (FR-16) | Bearer + `view_budget` |
@@ -207,12 +207,10 @@ Lives in [app/pipeline.py](app/pipeline.py) (steps) and [app/ai_client.py](app/a
 1. **Transcription (FR-07)** — each upload is sent to `whisper-1`. Silent audio (empty text
    or high `no_speech_prob`) is stored as `no_speech`, never as an invented transcript;
    errors become `failed`.
-2. **Follow-up (FR-08)** — `GET /interview/follow-up` starts generation once every base
-   answer is transcribed. `gpt-4o-mini` writes **exactly one** question, which is sanitised
-   (one sentence, injection-style text rejected) and stored in the audit log. If the AI
-   fails or the budget is frozen, a safe generic question is used so the candidate is
-   never stuck.
-3. **Scoring (FR-03 / FR-10)** — after the follow-up is transcribed: JSON mode, temperature
+2. **No AI follow-up (FR-08/09 removed).** Interviews are 5 drawn questions; the candidate
+   never sees how many. After the last answer (or the 5:00 timer) the frontend calls
+   `POST /interview/finish`, which marks the interview `completed` (no more uploads).
+3. **Scoring (FR-03 / FR-10)** — once the interview is finished and every answer is transcribed: JSON mode, temperature
    0, strict schema check, one corrective retry, then **manual review** (`GRADING_FAILED`)
    instead of guessing. A deterministic marker-phrase check ("Furthermore", "In
    conclusion", three-part structure…) feeds the prompt; if it fires and the model names no

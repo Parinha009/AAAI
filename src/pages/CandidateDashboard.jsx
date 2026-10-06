@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  getFollowUp,
+  finishInterview,
   getInterviewStatus,
   getQuestions,
   hasSession,
@@ -12,7 +12,6 @@ import Icon from '../components/Icon'
 import RoleMismatch from '../components/RoleMismatch'
 
 const BASE_ROUND_SECONDS = 300
-const FOLLOW_UP_SECONDS = 150
 const PROCESSING_DELAY_MS = 900
 
 const formatTime = (seconds) => {
@@ -94,20 +93,17 @@ function MicMeter({ level, small = false }) {
 }
 
 // The interview itself (FR-01/02/05/06/08/09/11/12/17). Server-only: questions,
-// uploads and the AI follow-up all come from the backend - there is no offline mode.
-function InterviewWorkspace({ candidateName, resumeStage = 'base', onClose }) {
+// uploads and submission all go through the backend - there is no offline mode.
+function InterviewWorkspace({ candidateName, onClose }) {
   const [stage, setStage] = useState('consent')
   const [consentAccepted, setConsentAccepted] = useState(false)
   const [baseSeconds, setBaseSeconds] = useState(BASE_ROUND_SECONDS)
-  const [followUpSeconds, setFollowUpSeconds] = useState(FOLLOW_UP_SECONDS)
   const [currentBaseIndex, setCurrentBaseIndex] = useState(0)
   const [isRecording, setIsRecording] = useState(false)
   const [responses, setResponses] = useState([])
   const [tabOutCount, setTabOutCount] = useState(0)
   const [processingTarget, setProcessingTarget] = useState(null)
   const [processingNote, setProcessingNote] = useState('')
-  // FR-08: the one AI follow-up question, fetched from the server.
-  const [followUpQuestion, setFollowUpQuestion] = useState(null)
   // Backend wiring: real questions + whether we're talking to the server.
   const [baseQuestions, setBaseQuestions] = useState([])
   const [apiMode, setApiMode] = useState(false)
@@ -131,10 +127,10 @@ function InterviewWorkspace({ candidateName, resumeStage = 'base', onClose }) {
   const questionIdRef = useRef(null)
   const heardFramesRef = useRef(0)
   const takePeakRef = useRef(0) // loudest moment of the current take
-  const uploadsRef = useRef([]) // in-flight uploads, awaited before asking for the follow-up
-  const isTimedStage = stage === 'base' || stage === 'follow_up'
-  const activeQuestion = stage === 'follow_up' ? followUpQuestion : baseQuestions[currentBaseIndex]
-  const activeSeconds = stage === 'follow_up' ? followUpSeconds : baseSeconds
+  const uploadsRef = useRef([]) // in-flight uploads, awaited before submitting the interview
+  const isTimedStage = stage === 'base'
+  const activeQuestion = baseQuestions[currentBaseIndex]
+  const activeSeconds = baseSeconds
   const answeredCurrentQuestion = responses.some((response) => response.questionId === activeQuestion?.id)
 
   useEffect(() => {
@@ -177,28 +173,10 @@ function InterviewWorkspace({ candidateName, resumeStage = 'base', onClose }) {
   }, [stage])
 
   useEffect(() => {
-    if (stage !== 'follow_up') {
-      return undefined
-    }
-
-    const intervalId = window.setInterval(() => {
-      setFollowUpSeconds((current) => Math.max(current - 1, 0))
-    }, 1000)
-
-    return () => window.clearInterval(intervalId)
-  }, [stage])
-
-  useEffect(() => {
     if (stage === 'base' && baseSeconds === 0) {
       submitCurrentAnswer('timer')
     }
   }, [baseSeconds, stage])
-
-  useEffect(() => {
-    if (stage === 'follow_up' && followUpSeconds === 0) {
-      submitCurrentAnswer('timer')
-    }
-  }, [followUpSeconds, stage])
 
   useEffect(() => {
     if (stage !== 'processing' || !processingTarget) {
@@ -210,45 +188,28 @@ function InterviewWorkspace({ candidateName, resumeStage = 'base', onClose }) {
       const startedAt = Date.now()
 
       ;(async () => {
-        // Make sure every answer reached the server first, so the AI sees all of them.
+        // Make sure every answer reached the server first, then submit the interview.
         await Promise.allSettled(uploadsRef.current)
 
-        if (processingTarget.nextStage !== 'follow_up') {
-          if (!cancelled) {
-            releaseMic()
-            setStage('completed')
-            setProcessingTarget(null)
-          }
-          return
-        }
-
-        // FR-17: poll in the background; never surface a raw timeout to the candidate.
+        // FR-17: retry in the background; never surface a raw network error.
         let failures = 0
         while (!cancelled) {
           try {
-            const data = await getFollowUp()
-            failures = 0
-            if (data?.text && !cancelled) {
-              setFollowUpQuestion({ id: 0, type: 'follow_up', prompt: data.text })
-              setFollowUpSeconds(data.follow_up_seconds || FOLLOW_UP_SECONDS)
-              setStage('follow_up')
+            await finishInterview()
+            if (!cancelled) {
+              releaseMic()
+              setStage('completed')
               setProcessingTarget(null)
-              return
             }
+            return
           } catch (error) {
             failures += 1
-            if (failures >= 3 && !cancelled) {
+            if (!cancelled && failures >= 2) {
               setProcessingNote(`We can't reach the server right now (${error.message}). Retrying automatically...`)
             }
           }
-
-          const elapsed = (Date.now() - startedAt) / 1000
-          if (!cancelled && failures < 3) {
-            if (elapsed > 90) {
-              setProcessingNote('This is taking longer than usual. Please keep this tab open.')
-            } else if (elapsed > 15) {
-              setProcessingNote('Still preparing your follow-up question...')
-            }
+          if (!cancelled && (Date.now() - startedAt) / 1000 > 90) {
+            setProcessingNote('This is taking longer than usual. Please keep this tab open.')
           }
           await new Promise((resolve) => window.setTimeout(resolve, 2000))
         }
@@ -263,9 +224,6 @@ function InterviewWorkspace({ candidateName, resumeStage = 'base', onClose }) {
       if (processingTarget.nextStage === 'next_base') {
         setCurrentBaseIndex((current) => Math.min(current + 1, baseQuestions.length - 1))
         setStage('base')
-      } else if (processingTarget.nextStage === 'follow_up') {
-        setFollowUpSeconds(FOLLOW_UP_SECONDS)
-        setStage('follow_up')
       } else {
         releaseMic()
         setStage('completed')
@@ -423,19 +381,12 @@ function InterviewWorkspace({ candidateName, resumeStage = 'base', onClose }) {
     setApiMode(true)
     setIsStarting(false)
     setBaseSeconds(BASE_ROUND_SECONDS)
-    setFollowUpSeconds(FOLLOW_UP_SECONDS)
     setCurrentBaseIndex(0)
     setIsRecording(false)
     setResponses([])
     setProcessingNote('')
-    setFollowUpQuestion(null)
     uploadsRef.current = []
 
-    if (resumeStage === 'follow_up') {
-      // Base answers were already submitted earlier: go straight to the follow-up.
-      beginProcessing('Loading your follow-up question...', 'follow_up')
-      return
-    }
     setProcessingTarget(null)
     setStage('base')
   }
@@ -499,11 +450,8 @@ function InterviewWorkspace({ candidateName, resumeStage = 'base', onClose }) {
         return
       }
 
-      beginProcessing('Processing your base responses and preparing a follow-up...', 'follow_up')
-      return
+      beginProcessing('Submitting your interview...', 'completed')
     }
-
-    beginProcessing('Processing your follow-up and finalizing your interview...', 'completed')
   }
 
   const toggleRecording = async () => {
@@ -535,23 +483,18 @@ function InterviewWorkspace({ candidateName, resumeStage = 'base', onClose }) {
       return
     }
 
-    const keep = isRecording
+    const isLast = currentBaseIndex >= baseQuestions.length - 1
+    const keep = isRecording && !isLast // never keep the mic running after the last answer
 
     if (stage === 'base') {
       await saveResponse(activeQuestion, 'manual', { keepRecording: keep })
 
-      if (currentBaseIndex < baseQuestions.length - 1) {
+      if (!isLast) {
         beginProcessing('Processing your answer before the next question...', 'next_base', { keepRecording: keep })
         return
       }
 
-      beginProcessing('Processing your base responses and preparing a follow-up...', 'follow_up', { keepRecording: keep })
-      return
-    }
-
-    if (stage === 'follow_up') {
-      await saveResponse(activeQuestion, 'manual')
-      beginProcessing('Processing your follow-up and finalizing your interview...', 'completed')
+      beginProcessing('Submitting your interview...', 'completed')
     }
   }
 
@@ -646,21 +589,17 @@ function InterviewWorkspace({ candidateName, resumeStage = 'base', onClose }) {
 
         {apiNotice ? <p className="recording-status" role="status">{apiNotice}</p> : null}
 
-        {stage === 'base' || stage === 'follow_up' ? (
+        {stage === 'base' ? (
           <>
             <div className="interview-panel-head">
               <span>
-                {stage === 'follow_up'
-                  ? 'Follow-up question - 2:30'
-                  : `Base question ${currentBaseIndex + 1} of ${baseQuestions.length}`}
+                {`Question ${currentBaseIndex + 1}`}
               </span>
               <strong><Icon name="clock" /> {formatTime(activeSeconds)}</strong>
             </div>
             <h1 id="interview-title" className="interview-question-title">{activeQuestion.prompt}</h1>
             <p className="interview-question-helper">
-              {stage === 'follow_up'
-                ? 'Answer the generated follow-up within the 2:30 window.'
-                : 'Answer naturally. The base round uses one shared five-minute timer across all base questions.'}
+              Answer naturally. All questions share one five-minute timer.
             </p>
             {quietTake && !isRecording ? (
               <p className="invite-note error" role="alert">
@@ -714,11 +653,7 @@ function InterviewWorkspace({ candidateName, resumeStage = 'base', onClose }) {
                 onClick={goToNextQuestion}
                 disabled={activeSeconds === 0}
               >
-                {stage === 'follow_up'
-                  ? 'Finish'
-                  : currentBaseIndex === baseQuestions.length - 1
-                    ? 'Follow-up'
-                    : 'Next'}
+                Next
                 <Icon name="arrowRight" />
               </button>
             </div>
@@ -750,12 +685,8 @@ function InterviewWorkspace({ candidateName, resumeStage = 'base', onClose }) {
             </p>
             <dl className="interview-complete-summary">
               <div>
-                <dt>Base answers</dt>
+                <dt>Answers</dt>
                 <dd>{responses.filter((response) => response.type === 'base').length}</dd>
-              </div>
-              <div>
-                <dt>Follow-up</dt>
-                <dd>{responses.some((response) => response.type === 'follow_up') ? 'Submitted' : 'Skipped'}</dd>
               </div>
               <div>
                 <dt>Tab outs</dt>
@@ -786,7 +717,7 @@ const STAGE_CARDS = {
   consent: {
     eyebrow: 'Invitation',
     title: 'Your AI interview is ready',
-    copy: 'Answer 3-5 questions out loud within one 5:00 timer, then one AI follow-up question (2:30).',
+    copy: 'Answer each question out loud. All questions share one 5:00 timer, so keep your answers focused.',
     action: 'Start interview',
   },
   base: {
@@ -794,12 +725,6 @@ const STAGE_CARDS = {
     title: 'Continue your interview',
     copy: 'You started this interview earlier. Starting again shows the questions from the beginning.',
     action: 'Continue interview',
-  },
-  follow_up: {
-    eyebrow: 'Almost done',
-    title: 'Answer your follow-up question',
-    copy: 'Your base answers are in. One AI follow-up question is waiting for you (2:30).',
-    action: 'Answer follow-up',
   },
   scoring: {
     eyebrow: 'Submitted',
@@ -1001,7 +926,6 @@ export default function CandidateDashboard({
       {isInterviewOpen ? (
         <InterviewWorkspace
           candidateName={firstName}
-          resumeStage={stage === 'follow_up' ? 'follow_up' : 'base'}
           onClose={() => {
             setIsInterviewOpen(false)
             setReloadKey((key) => key + 1) // refresh the status card

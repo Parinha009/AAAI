@@ -34,5 +34,5 @@ Working rules for this repo. Project overview, flow, and team lanes are in `READ
 ## Known gaps — don't mistake these for bugs
 
 - The README names Tailwind CSS, but it is **not installed**. Styling today is plain CSS in `src/index.css`. Don't add Tailwind unprompted, and don't write Tailwind class names expecting them to work.
-- The AI pipeline (FR-07 transcription, FR-08 follow-up, FR-03/10 scoring) is built in `03-development/backend/app/pipeline.py`. With no `OPENAI_API_KEY` in `.env` it runs a clearly-labelled `[Simulated]` provider — simulated transcripts/scores are expected then, not a bug. Tests always simulate.
+- The AI pipeline (FR-07 transcription, FR-03/10 scoring) is built in `03-development/backend/app/pipeline.py`; the FR-08 AI follow-up was removed by product decision (interviews are 5 random questions, count hidden from candidates, ended via `POST /interview/finish`). With no `OPENAI_API_KEY` in `.env` it runs a clearly-labelled `[Simulated]` provider — simulated transcripts/scores are expected then, not a bug. Tests always simulate.
 - Contract v1.1 additions, pending the Lead's log: `POST /jobs/{id}/invite` and `GET /jobs/{id}/candidates` (see the backend README).

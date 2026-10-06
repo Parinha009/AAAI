@@ -43,11 +43,10 @@ class ResponseStatus(BaseModel):
     no_speech_flag: bool = False
 
 
-# --- Follow-up question (FR-08) -------------------------------------------
-class FollowUpQuestion(BaseModel):
-    question_id: int = 0  # 0 = the follow-up
-    text: str
-    follow_up_seconds: int
+# --- Finish the interview ------------------------------------------------
+class FinishResponse(BaseModel):
+    status: str = "submitted"
+    candidate_status: str
 
 
 # --- Tab-out (FR-12) ------------------------------------------------------
@@ -63,5 +62,5 @@ class TabOutResponse(BaseModel):
 # --- Screen-flow driver (FR-17) ------------------------------------------
 class InterviewStatusResponse(BaseModel):
     candidate_status: str
-    stage: str = Field(..., description="consent | base | processing | follow_up | scoring | completed")
+    stage: str = Field(..., description="consent | base | completed")
     next_action: str

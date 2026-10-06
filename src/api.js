@@ -94,9 +94,10 @@ export function postTabOut(questionId) {
   }).then(parse).catch(() => null)
 }
 
-// FR-08: the one AI follow-up. 202 {status:'generating'} until ready, then 200 {text, follow_up_seconds}.
-export function getFollowUp() {
-  return fetch(`${API_BASE}/interview/follow-up`, { headers: authHeaders() }).then(parse)
+// Submit the interview after the last answer (or when the timer ends). AI scoring
+// runs on the server once every answer is transcribed. -> 202 { status, candidate_status }
+export function finishInterview() {
+  return fetch(`${API_BASE}/interview/finish`, { method: 'POST', headers: authHeaders() }).then(parse)
 }
 
 // --- Recruiter: invite a candidate (FR-04 — candidates are invited, not self-registered)

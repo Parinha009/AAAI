@@ -56,7 +56,7 @@ const workflowSteps = [
   {
     count: '03',
     title: 'Shortlist',
-    copy: 'Review ranked signals, follow-up prompts, and recruiter-ready summaries in one place.',
+    copy: 'Review ranked scores, transcripts, recordings, and recruiter-ready summaries in one place.',
   },
 ]
 
@@ -321,7 +321,7 @@ export default function Landing({
                 <span>Interview</span>
                 <strong>Ready</strong>
               </div>
-              <p>Follow-up prompt generated after a calm, structured review.</p>
+              <p>Spoken answers transcribed and scored after a calm, structured interview.</p>
             </section>
             <section className="preview-panel">
               <div className="preview-panel-header">

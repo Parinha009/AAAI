@@ -90,3 +90,15 @@ def test_tab_out_logged_and_audit_is_immutable(client, candidate_headers, new_ca
         assert blocked, "auditlogs UPDATE should be blocked by the DB trigger"
     finally:
         db.close()
+
+
+def test_tab_out_records_why_the_candidate_left(client, candidate_headers, new_candidate, recruiter_headers):
+    """Clicking into another app (window blur) is logged like a tab switch, with the reason."""
+    consent(client, candidate_headers)
+    for reason in ("window_blur", "tab_hidden", "something-else"):
+        r = client.post(f"{API}/interview/events/tab-out", headers=candidate_headers,
+                        json={"question_id": 1, "reason": reason})
+        assert r.status_code == 202
+    events = client.get(f"{API}/candidates/{new_candidate['candidate_id']}/audit", headers=recruiter_headers).json()["events"]
+    reasons = [e["payload"].get("reason") for e in events if e["event_type"] == "TAB_OUT"]
+    assert reasons == ["window_blur", "tab_hidden", None]  # unknown reasons are not stored

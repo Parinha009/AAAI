@@ -7466,3 +7466,34 @@ img {
 .lx-footer-bottom {
   padding: 18px clamp(20px, 2.5vw, 36px) 0;
 }
+
+/* Anti-cheat warnings (FR-12) */
+.stay-warning,
+.left-window-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 12px 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  text-align: left;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.stay-warning {
+  color: var(--text);
+  background: var(--warning-soft);
+  border: 1px solid rgba(183, 121, 31, 0.25);
+}
+
+.left-window-notice {
+  align-items: center;
+  color: #7a4b00;
+  background: var(--warning-soft);
+  border: 1px solid rgba(183, 121, 31, 0.35);
+}
+
+.left-window-notice .text-link {
+  margin-left: auto;
+}

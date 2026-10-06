@@ -86,11 +86,12 @@ export function uploadResponse({ questionId, type, blob }) {
 }
 
 // FR-12 — fire-and-forget tab-out log; never interrupts the interview.
-export function postTabOut(questionId) {
+// reason: 'tab_hidden' (switched tab / minimised) or 'window_blur' (clicked another app).
+export function postTabOut(questionId, reason) {
   return fetch(`${API_BASE}/interview/events/tab-out`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body: JSON.stringify({ question_id: questionId ?? 0 }),
+    body: JSON.stringify({ question_id: questionId ?? 0, reason }),
   }).then(parse).catch(() => null)
 }
 

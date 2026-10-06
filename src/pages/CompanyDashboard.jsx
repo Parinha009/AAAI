@@ -124,7 +124,10 @@ function describeAuditEvent(event) {
   if (event.event_type === 'CONSENT') {
     detail = `Consent recorded (version ${p.consent_version || 'v1'}).`
   } else if (event.event_type === 'TAB_OUT') {
-    detail = `Left the interview tab${p.question_id ? ` during question ${p.question_id}` : ''}.`
+    const how = p.reason === 'window_blur'
+      ? 'Switched to another app or window'
+      : p.reason === 'tab_hidden' ? 'Switched browser tab or minimised' : 'Left the interview tab'
+    detail = `${how}${p.question_id ? ` during question ${p.question_id}` : ''}.`
   } else if (event.event_type === 'AI_REQUEST') {
     detail = `${kind} request sent to ${p.model || 'the AI model'}${p.attempt > 1 ? ` (retry ${p.attempt})` : ''}.`
   } else if (event.event_type === 'AI_RESPONSE' && p.kind === 'transcription') {

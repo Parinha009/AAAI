@@ -54,6 +54,9 @@ class FinishResponse(BaseModel):
 class TabOutRequest(BaseModel):
     question_id: int
     occurred_at: datetime | None = None
+    # v1.1: 'tab_hidden' (switched browser tab / minimised) or 'window_blur'
+    # (clicked into another app or window). Optional - older clients omit it.
+    reason: str | None = None
 
 
 class TabOutResponse(BaseModel):

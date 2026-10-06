@@ -105,6 +105,7 @@ function InterviewWorkspace({ candidateName, onClose }) {
   const [isRecording, setIsRecording] = useState(false)
   const [responses, setResponses] = useState([])
   const [tabOutCount, setTabOutCount] = useState(0)
+  const [leftNotice, setLeftNotice] = useState(false) // shown after the candidate comes back
   const [processingTarget, setProcessingTarget] = useState(null)
   const [processingNote, setProcessingNote] = useState('')
   // Backend wiring: real questions + whether we're talking to the server.
@@ -128,6 +129,7 @@ function InterviewWorkspace({ candidateName, onClose }) {
   const pendingBlobRef = useRef(null)
   const apiModeRef = useRef(false)
   const questionIdRef = useRef(null)
+  const awayRef = useRef(false) // currently away from the interview window
   const heardFramesRef = useRef(0)
   const takePeakRef = useRef(0) // loudest moment of the current take
   const uploadsRef = useRef([]) // in-flight uploads, awaited before submitting the interview
@@ -142,24 +144,44 @@ function InterviewWorkspace({ candidateName, onClose }) {
     }
 
     const preventShortcut = (event) => event.preventDefault()
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        setTabOutCount((current) => current + 1)
-        // FR-12: log to the backend's immutable audit trail (fire-and-forget).
-        if (apiModeRef.current) {
-          postTabOut(questionIdRef.current)
-        }
+    // Fresh start for each question screen (listeners are off during "Processing...").
+    awayRef.current = document.hidden || !document.hasFocus()
+
+    // FR-12: leaving the interview is recorded. Two signals, counted once per departure:
+    // - the tab is hidden (switched tab, minimised), or
+    // - the window lost focus (clicked into another app or window - e.g. a chat app
+    //   floating over the browser, which never hides the tab).
+    const leave = (reason) => {
+      if (awayRef.current) {
+        return // switching tabs fires both signals - one departure counts once
+      }
+      awayRef.current = true
+      setTabOutCount((current) => current + 1)
+      if (apiModeRef.current) {
+        postTabOut(questionIdRef.current, reason) // fire-and-forget -> immutable audit trail
       }
     }
+    const comeBack = () => {
+      if (awayRef.current && !document.hidden && document.hasFocus()) {
+        awayRef.current = false
+        setLeftNotice(true)
+      }
+    }
+    const handleVisibilityChange = () => (document.hidden ? leave('tab_hidden') : comeBack())
+    const handleBlur = () => leave('window_blur')
 
     document.addEventListener('paste', preventShortcut)
     document.addEventListener('contextmenu', preventShortcut)
     document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('blur', handleBlur)
+    window.addEventListener('focus', comeBack)
 
     return () => {
       document.removeEventListener('paste', preventShortcut)
       document.removeEventListener('contextmenu', preventShortcut)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('blur', handleBlur)
+      window.removeEventListener('focus', comeBack)
     }
   }, [isTimedStage])
 
@@ -268,6 +290,15 @@ function InterviewWorkspace({ candidateName, onClose }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // The "you left the window" notice clears itself after a few seconds.
+  useEffect(() => {
+    if (!leftNotice) {
+      return undefined
+    }
+    const timeoutId = window.setTimeout(() => setLeftNotice(false), 8000)
+    return () => window.clearTimeout(timeoutId)
+  }, [leftNotice])
 
   // Keep refs in sync so the tab-out listener always sees current values.
   useEffect(() => {
@@ -521,7 +552,7 @@ function InterviewWorkspace({ candidateName, onClose }) {
         </button>
         <div className="interview-session-meta">
           <span><Icon name="shield" /> Paste locked</span>
-          <span><Icon name="flag" /> Tab outs {tabOutCount}</span>
+          <span><Icon name="flag" /> Left window: {tabOutCount}</span>
           {apiMode ? <span>Connected to server</span> : null}
         </div>
         <button type="button" className="company-close-button interview-close" onClick={onClose} aria-label="Close interview">
@@ -546,6 +577,13 @@ function InterviewWorkspace({ candidateName, onClose }) {
               />
               <span>I understand this interview is recorded and evaluated with AI.</span>
             </label>
+            <p className="stay-warning" role="note">
+              <Icon name="flag" size={16} />
+              <span>
+                <strong>Stay in this window during the interview.</strong> Switching to another tab, app or window
+                while answering is recorded and shown to the hiring team. Pasting is turned off.
+              </span>
+            </p>
 
             <section className="mic-check" aria-label="Microphone check">
               <div className="mic-check-head">
@@ -615,6 +653,13 @@ function InterviewWorkspace({ candidateName, onClose }) {
             <p className="interview-question-helper">
               Answer naturally - about 1-2 minutes is ideal. Press Next when you&apos;re done.
             </p>
+            {leftNotice ? (
+              <p className="left-window-notice" role="alert">
+                <Icon name="flag" size={16} />
+                <span>You left the interview window - this has been recorded for the hiring team.</span>
+                <button type="button" className="text-link" onClick={() => setLeftNotice(false)}>OK</button>
+              </p>
+            ) : null}
             {quietTake && !isRecording ? (
               <p className="invite-note error" role="alert">
                 We could barely hear you on that answer. Check your microphone (the bar below should move when you
@@ -703,7 +748,7 @@ function InterviewWorkspace({ candidateName, onClose }) {
                 <dd>{responses.filter((response) => response.type === 'base').length}</dd>
               </div>
               <div>
-                <dt>Tab outs</dt>
+                <dt>Left window</dt>
                 <dd>{tabOutCount}</dd>
               </div>
               <div>

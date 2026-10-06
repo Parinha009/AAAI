@@ -260,6 +260,7 @@ def tab_out(
             payload={
                 "question_id": payload.question_id,
                 "occurred_at": (payload.occurred_at or datetime.now(timezone.utc)).isoformat(),
+                "reason": payload.reason if payload.reason in ("tab_hidden", "window_blur") else None,
             },
         )
     )

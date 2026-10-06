@@ -181,10 +181,27 @@ def test_robotic_language_downweights_communication():
     assert pipeline.robotic_flags([templated])["saturated"] is True
     assert pipeline.robotic_flags([natural])["saturated"] is False
 
-    card = {"communication": 4, "rationale": {"robotic_language": "none"}}
-    pipeline._apply_robotic_adjustment(card, pipeline.robotic_flags([templated]))
-    assert card["communication"] == 3
+    card = {"communication": 4, "rationale": {"communication": "Clear.", "robotic_language": "none"}}
+    pipeline._apply_robotic_cap(card, pipeline.robotic_flags([templated]))
+    assert card["communication"] == 2  # Lead rubric: capped at 2
     assert "furthermore" in card["rationale"]["robotic_language"]
+    assert "capped at 2" in card["rationale"]["communication"]  # trigger named (FR-10)
+
+    # Natural answers are left alone; a model-reported trigger also enforces the cap.
+    calm = {"communication": 4, "rationale": {"communication": "Clear.", "robotic_language": "none"}}
+    pipeline._apply_robotic_cap(calm, pipeline.robotic_flags([natural]))
+    assert calm["communication"] == 4
+    flagged = {"communication": 5, "rationale": {"communication": "Fluent.", "robotic_language": "read aloud"}}
+    pipeline._apply_robotic_cap(flagged, pipeline.robotic_flags([natural]))
+    assert flagged["communication"] == 2
+
+
+def test_question_objects_and_strings():
+    from types import SimpleNamespace
+    lead = SimpleNamespace(base_questions=[{"question_id": 7, "order": 1, "text": "Why APIs?", "trait": "communication"}])
+    legacy = SimpleNamespace(base_questions=["Q one?", "Q two?"])
+    assert pipeline.base_question_map(lead) == {7: {"text": "Why APIs?", "trait": "communication"}}
+    assert pipeline.base_question_map(legacy)[2] == {"text": "Q two?", "trait": None}
 
 
 def test_validate_scorecard_schema():

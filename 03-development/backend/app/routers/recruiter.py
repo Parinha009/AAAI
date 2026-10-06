@@ -138,7 +138,7 @@ def candidate_detail(candidate_id: int, db: Session = Depends(get_db)) -> Candid
     if cand is None:
         raise api_error(404, "NOT_FOUND", "No such candidate")
     job = db.get(Job, cand.job_id)
-    base_questions = (job.base_questions or []) if job else []
+    base_questions = pipeline.base_question_map(job)
     follow_up_text = pipeline.follow_up_question(db, candidate_id)
 
     responses = db.execute(
@@ -148,8 +148,8 @@ def candidate_detail(candidate_id: int, db: Session = Depends(get_db)) -> Candid
     resp_out = []
     for r in responses:
         qtext = None
-        if r.type == "base" and 1 <= r.question_id <= len(base_questions):
-            qtext = base_questions[r.question_id - 1]
+        if r.type == "base" and r.question_id in base_questions:
+            qtext = base_questions[r.question_id]["text"]
         elif r.type == "follow_up":
             qtext = follow_up_text
         resp_out.append(
@@ -231,11 +231,11 @@ def invite_candidate(job_id: int, payload: InviteRequest, db: Session = Depends(
     email = payload.email.strip().lower()
     if not _EMAIL_RE.match(email):
         raise api_error(422, "VALIDATION_ERROR", "Enter a valid email address", {"field": "email"})
-    if db.query(Recruiter).filter(Recruiter.email == email).first() is not None:
+    if db.query(Recruiter).filter(func.lower(Recruiter.email) == email).first() is not None:
         raise api_error(409, "CONFLICT", "That email belongs to a recruiter account")
 
     candidate = (
-        db.query(Candidate).filter(Candidate.email == email, Candidate.job_id == job_id).first()
+        db.query(Candidate).filter(func.lower(Candidate.email) == email, Candidate.job_id == job_id).first()
     )
     if candidate is None:
         candidate = Candidate(job_id=job_id, email=email, name=payload.name, status="invited")

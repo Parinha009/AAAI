@@ -232,8 +232,30 @@ def sanitize_follow_up(raw: str) -> str | None:
     return line if line.endswith("?") else line + "?"
 
 
-def _base_answers(db, candidate_id: int, job: Job) -> list[tuple[str, str]]:
-    questions = job.base_questions or []
+DEFAULT_ROBOTIC_CAP = 2  # Lead rubric: robotic language caps communication at 2 (FR-10)
+
+
+def base_question_map(job: Job | None) -> dict[int, dict]:
+    """question_id -> {text, trait}. Stored questions are plain strings (early seed) or
+    Lead-authored objects {question_id, order, text, trait}; both are accepted."""
+    out = {}
+    for i, q in enumerate((job.base_questions or []) if job else []):
+        if isinstance(q, dict):
+            out[q.get("question_id", i + 1)] = {"text": q.get("text", ""), "trait": q.get("trait")}
+        else:
+            out[i + 1] = {"text": str(q), "trait": None}
+    return out
+
+
+def _robotic_cap(job: Job) -> int:
+    flags = (job.rubric_config or {}).get("flags") or {}
+    cap = flags.get("robotic_language_caps_communication_at", DEFAULT_ROBOTIC_CAP)
+    return cap if isinstance(cap, int) and 1 <= cap <= 5 else DEFAULT_ROBOTIC_CAP
+
+
+def _base_answers(db, candidate_id: int, job: Job) -> list[tuple[str, str, str | None]]:
+    """(question text, answer text, trait the question probes) per base answer."""
+    questions = base_question_map(job)
     rows = db.execute(
         select(Response)
         .where(Response.candidate_id == candidate_id, Response.type == "base")
@@ -241,8 +263,8 @@ def _base_answers(db, candidate_id: int, job: Job) -> list[tuple[str, str]]:
     ).scalars().all()
     out = []
     for r in rows:
-        q = questions[r.question_id - 1] if 1 <= r.question_id <= len(questions) else f"Question {r.question_id}"
-        out.append((q, _answer_text(r)))
+        q = questions.get(r.question_id, {"text": f"Question {r.question_id}", "trait": None})
+        out.append((q["text"], _answer_text(r), q["trait"]))
     return out
 
 
@@ -252,7 +274,7 @@ def _answer_text(r: Response) -> str:
     return "(no speech detected)" if r.no_speech_flag else "(transcription unavailable)"
 
 
-def _follow_up_messages(job: Job, answers: list[tuple[str, str]]) -> list[dict]:
+def _follow_up_messages(job: Job, answers: list[tuple[str, str, str | None]]) -> list[dict]:
     extra = (job.rubric_config or {}).get("follow_up_prompt", "")
     system = (
         f'You are a technical interviewer for the role "{job.title}". The candidate\'s '
@@ -263,7 +285,7 @@ def _follow_up_messages(job: Job, answers: list[tuple[str, str]]) -> list[dict]:
         "sentence ending with a question mark, at most 40 words, no preamble, numbering or quotes."
         + (f"\nRole context: {extra}" if extra else "")
     )
-    body = "\n".join(f"Q{i}: {q}\nA{i}: {a}" for i, (q, a) in enumerate(answers, 1)) or "(no answers recorded)"
+    body = "\n".join(f"Q{i}: {q}\nA{i}: {a}" for i, (q, a, _) in enumerate(answers, 1)) or "(no answers recorded)"
     return [
         {"role": "system", "content": system},
         {"role": "user", "content": f"<answers>\n{body}\n</answers>"},
@@ -367,6 +389,7 @@ def validate_scorecard(raw: str) -> tuple[dict | None, str | None]:
 
 def _scoring_messages(job: Job, items: list[tuple[str, str, str]], flags: dict) -> list[dict]:
     rubric = {k: v for k, v in (job.rubric_config or {}).items() if k != "follow_up_prompt"} or DEFAULT_RUBRIC
+    cap = _robotic_cap(job)
     system = (
         f'You are a strict, consistent hiring assessor for the role "{job.title}". Score the '
         "candidate on exactly four traits, each an integer from 1 to 5, using this rubric:\n"
@@ -376,9 +399,10 @@ def _scoring_messages(job: Job, items: list[tuple[str, str, str]], flags: dict) 
         "'(no speech detected)' or '(transcription unavailable)' count as unanswered.\n"
         "Anti-templating rule (FR-10): detect robotic or templated language - textbook transition "
         "phrases (e.g. 'Furthermore', 'Moreover', 'In conclusion'), rigid three-part essay "
-        "structure, artificial phrasing loops, unnaturally uniform sentences. If such patterns "
-        "dominate, lower communication by 1-2 points and name the trigger in "
-        "rationale.robotic_language; otherwise set rationale.robotic_language to \"none\".\n"
+        "structure, artificial phrasing loops, unnaturally uniform sentences, read-aloud or "
+        f"AI-generated delivery. If the transcript reads that way, cap communication at {cap}, name "
+        "the trigger in rationale.communication, and repeat it in rationale.robotic_language; "
+        "otherwise set rationale.robotic_language to \"none\".\n"
         "Reply with ONLY this JSON object: {\"technical_skill\": int, \"communication\": int, "
         "\"problem_solving\": int, \"job_fit\": int, \"rationale\": {\"technical_skill\": str, "
         "\"communication\": str, \"problem_solving\": str, \"job_fit\": str, "
@@ -427,7 +451,10 @@ def score_candidate(candidate_id: int) -> None:
                 db.commit()
                 return
 
-            items = [(f"Q{i}", q, a) for i, (q, a) in enumerate(_base_answers(db, candidate_id, job), 1)]
+            items = [
+                (f"Q{i}" + (f" - mainly probes {trait}" if trait else ""), q, a)
+                for i, (q, a, trait) in enumerate(_base_answers(db, candidate_id, job), 1)
+            ]
             follow = db.execute(select(Response).where(
                 Response.candidate_id == candidate_id, Response.type == "follow_up",
             )).scalars().first()
@@ -471,7 +498,7 @@ def score_candidate(candidate_id: int) -> None:
                 }]
 
             if card:
-                _apply_robotic_adjustment(card, flags)
+                _apply_robotic_cap(card, flags, _robotic_cap(job))
                 db.add(Score(
                     candidate_id=candidate_id, job_id=job.job_id,
                     **{t: card[t] for t in TRAITS},
@@ -483,22 +510,31 @@ def score_candidate(candidate_id: int) -> None:
             db.close()
 
 
-def _apply_robotic_adjustment(card: dict, flags: dict) -> None:
-    """FR-10 safety net: if the heuristic says the answers are saturated with templated
-    phrasing but the model reported no trigger, apply the documented -1 communication
-    adjustment ourselves and name the trigger, so it is never silently skipped."""
-    if not flags.get("saturated"):
-        return
+def _apply_robotic_cap(card: dict, flags: dict, cap: int = DEFAULT_ROBOTIC_CAP) -> None:
+    """FR-10 / Lead rubric: robotic language caps communication at `cap` (default 2).
+
+    Triggered when the model names a robotic-language trigger, or when the deterministic
+    marker-phrase check says the answers are saturated. Enforced in code so the cap can
+    never be silently skipped, and the trigger is always named in rationale.communication."""
     rationale = card["rationale"]
-    if rationale.get("robotic_language", "none").lower() not in ("none", "no", "n/a", ""):
-        return  # the model already applied and named the down-weighting
-    card["communication"] = max(1, card["communication"] - 1)
-    markers = ", ".join(f"'{m}' x{n}" for m, n in flags["marker_hits"].items())
-    rationale["robotic_language"] = (
-        f"Heuristic trigger: templated marker phrases ({markers}"
-        f"{'; rigid three-part structure' if flags['three_part_structure'] else ''}). "
-        "Communication down-weighted by 1 (FR-10)."
-    )
+    model_trigger = rationale.get("robotic_language", "none").strip()
+    model_flagged = model_trigger.lower() not in ("none", "no", "n/a", "")
+    if not (model_flagged or flags.get("saturated")):
+        return
+
+    if model_flagged:
+        trigger = model_trigger
+    else:
+        markers = ", ".join(f"'{m}' x{n}" for m, n in flags["marker_hits"].items())
+        trigger = (f"templated marker phrases ({markers}"
+                   f"{'; rigid three-part structure' if flags['three_part_structure'] else ''})")
+        rationale["robotic_language"] = f"Heuristic trigger: {trigger}"
+
+    if card["communication"] > cap:
+        card["communication"] = cap
+    note = f"Robotic-language cap (FR-10): communication capped at {cap} - {trigger}."
+    if "robotic" not in rationale["communication"].lower():
+        rationale["communication"] = f"{rationale['communication'].rstrip()} {note}"
 
 
 # --- CLI: re-run the pipeline for answers recorded before it existed ----------

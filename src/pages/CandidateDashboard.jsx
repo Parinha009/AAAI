@@ -30,6 +30,68 @@ const getAudioMimeType = () => {
   return ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'].find((type) => window.MediaRecorder.isTypeSupported(type)) || ''
 }
 
+// Speech is roughly -20 to -30 dBFS; a mic that only hears room hiss sits near -50.
+// Above this RMS (about -34 dBFS) we treat the candidate as audible.
+const HEARD_RMS = 0.02
+
+// Live microphone loudness (RMS, 0..1) for a stream, via the Web Audio API.
+// Updates ~10x a second so the meter moves without re-rendering every frame.
+function useMicLevel(stream) {
+  const [level, setLevel] = useState(0)
+
+  useEffect(() => {
+    if (!stream) {
+      setLevel(0)
+      return undefined
+    }
+    const AudioCtx = window.AudioContext || window.webkitAudioContext
+    if (!AudioCtx) {
+      return undefined
+    }
+    const ctx = new AudioCtx()
+    const source = ctx.createMediaStreamSource(stream)
+    const analyser = ctx.createAnalyser()
+    analyser.fftSize = 1024
+    source.connect(analyser)
+    const data = new Float32Array(analyser.fftSize)
+    let frame = 0
+    let last = 0
+    const tick = (now) => {
+      if (now - last > 100) {
+        last = now
+        analyser.getFloatTimeDomainData(data)
+        let sum = 0
+        for (let i = 0; i < data.length; i += 1) sum += data[i] * data[i]
+        setLevel(Math.sqrt(sum / data.length))
+      }
+      frame = window.requestAnimationFrame(tick)
+    }
+    frame = window.requestAnimationFrame(tick)
+    return () => {
+      window.cancelAnimationFrame(frame)
+      source.disconnect()
+      ctx.close()
+    }
+  }, [stream])
+
+  return level
+}
+
+// RMS -> 0..100 for the meter (-60 dBFS empty, -15 dBFS full).
+const levelPercent = (rms) => {
+  if (!rms) return 0
+  const db = 20 * Math.log10(rms)
+  return Math.max(0, Math.min(100, ((db + 60) / 45) * 100))
+}
+
+function MicMeter({ level, small = false }) {
+  return (
+    <div className={small ? 'mic-meter small' : 'mic-meter'} aria-hidden="true">
+      <span className={level >= HEARD_RMS ? 'heard' : ''} style={{ width: `${levelPercent(level)}%` }} />
+    </div>
+  )
+}
+
 // The interview itself (FR-01/02/05/06/08/09/11/12/17). Server-only: questions,
 // uploads and the AI follow-up all come from the backend - there is no offline mode.
 function InterviewWorkspace({ candidateName, resumeStage = 'base', onClose }) {
@@ -50,6 +112,15 @@ function InterviewWorkspace({ candidateName, resumeStage = 'base', onClose }) {
   const [apiMode, setApiMode] = useState(false)
   const [apiNotice, setApiNotice] = useState('')
   const [isStarting, setIsStarting] = useState(false)
+  // Microphone check (NFR-05): pick the device, see the level, prove we can hear you.
+  const [micStream, setMicStream] = useState(null)
+  const [micDevices, setMicDevices] = useState([])
+  const [micDeviceId, setMicDeviceId] = useState('')
+  const [micError, setMicError] = useState('')
+  const [micHeard, setMicHeard] = useState(false)
+  const [skipMicCheck, setSkipMicCheck] = useState(false)
+  const [quietTake, setQuietTake] = useState(false)
+  const micLevel = useMicLevel(micStream)
   // Real microphone recording (FR-02).
   const recorderRef = useRef(null)
   const chunksRef = useRef([])
@@ -57,6 +128,8 @@ function InterviewWorkspace({ candidateName, resumeStage = 'base', onClose }) {
   const pendingBlobRef = useRef(null)
   const apiModeRef = useRef(false)
   const questionIdRef = useRef(null)
+  const heardFramesRef = useRef(0)
+  const takePeakRef = useRef(0) // loudest moment of the current take
   const uploadsRef = useRef([]) // in-flight uploads, awaited before asking for the follow-up
   const isTimedStage = stage === 'base' || stage === 'follow_up'
   const activeQuestion = stage === 'follow_up' ? followUpQuestion : baseQuestions[currentBaseIndex]
@@ -210,6 +283,24 @@ function InterviewWorkspace({ candidateName, resumeStage = 'base', onClose }) {
     setStage('processing')
   }
 
+  // Track loudness: proves the mic works on the consent screen, and measures each take.
+  useEffect(() => {
+    if (isRecording) {
+      takePeakRef.current = Math.max(takePeakRef.current, micLevel)
+    }
+    if (!micHeard && micLevel >= HEARD_RMS) {
+      heardFramesRef.current += 1
+      if (heardFramesRef.current >= 3) setMicHeard(true) // ~0.3s of real sound
+    }
+  }, [micLevel, isRecording, micHeard])
+
+  useEffect(() => {
+    if (stage === 'consent' && !streamRef.current && navigator.mediaDevices?.getUserMedia) {
+      openMic('')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // Keep refs in sync so the tab-out listener always sees current values.
   useEffect(() => {
     apiModeRef.current = apiMode
@@ -228,13 +319,42 @@ function InterviewWorkspace({ candidateName, resumeStage = 'base', onClose }) {
   const releaseMic = () => {
     streamRef.current?.getTracks().forEach((track) => track.stop())
     streamRef.current = null
+    setMicStream(null)
+  }
+
+  // Open (or switch) the microphone. Records from exactly the device the candidate checked.
+  const openMic = async (deviceId = micDeviceId) => {
+    setMicError('')
+    try {
+      streamRef.current?.getTracks().forEach((track) => track.stop())
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: deviceId ? { deviceId: { exact: deviceId } } : true,
+      })
+      streamRef.current = stream
+      setMicStream(stream)
+      const activeId = stream.getAudioTracks()[0]?.getSettings().deviceId || deviceId
+      setMicDeviceId(activeId || '')
+      const devices = await navigator.mediaDevices.enumerateDevices()
+      setMicDevices(devices.filter((device) => device.kind === 'audioinput'))
+      heardFramesRef.current = 0
+      setMicHeard(false)
+      return stream
+    } catch (error) {
+      setMicError(error.name === 'NotAllowedError'
+        ? 'Microphone access is blocked. Click the lock icon in the address bar, allow the microphone, then try again.'
+        : `Microphone unavailable: ${error.message}`)
+      return null
+    }
   }
 
   const startRecording = async () => {
     try {
-      if (!streamRef.current) {
-        streamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true })
+      if (!streamRef.current && !(await openMic())) {
+        setIsRecording(false)
+        return
       }
+      takePeakRef.current = 0
+      setQuietTake(false)
       const mimeType = getAudioMimeType()
       const recorder = new MediaRecorder(streamRef.current, mimeType ? { mimeType } : undefined)
       chunksRef.current = []
@@ -261,6 +381,7 @@ function InterviewWorkspace({ candidateName, resumeStage = 'base', onClose }) {
       return
     }
     recorder.onstop = () => {
+      setQuietTake(takePeakRef.current < HEARD_RMS) // we barely heard anything on this take
       const blob = chunksRef.current.length
         ? new Blob(chunksRef.current, { type: recorder.mimeType || 'audio/webm' })
         : null
@@ -467,9 +588,58 @@ function InterviewWorkspace({ candidateName, resumeStage = 'base', onClose }) {
               />
               <span>I understand this interview is recorded and evaluated with AI.</span>
             </label>
-            <button type="button" className="solid-button" disabled={!consentAccepted || isStarting} onClick={beginBaseRound}>
+
+            <section className="mic-check" aria-label="Microphone check">
+              <div className="mic-check-head">
+                <Icon name="mic" size={18} />
+                <strong>Microphone check</strong>
+              </div>
+              {micError ? (
+                <>
+                  <p className="invite-note error">{micError}</p>
+                  <button type="button" className="soft-button" onClick={() => openMic(micDeviceId)}>Try again</button>
+                </>
+              ) : (
+                <>
+                  {micDevices.length > 1 ? (
+                    <label className="mic-device">
+                      <span>Microphone</span>
+                      <select value={micDeviceId} onChange={(event) => openMic(event.target.value)}>
+                        {micDevices.map((device, index) => (
+                          <option key={device.deviceId || index} value={device.deviceId}>
+                            {device.label || `Microphone ${index + 1}`}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : micDevices[0]?.label ? (
+                    <p className="mic-device-name">{micDevices[0].label}</p>
+                  ) : null}
+                  <MicMeter level={micLevel} />
+                  <p className={micHeard ? 'invite-note success' : 'invite-note'} role="status">
+                    {micHeard
+                      ? 'We can hear you clearly.'
+                      : micStream
+                        ? 'Say a few words - the bar should move and turn green. If it stays flat, choose another microphone.'
+                        : 'Allow microphone access when your browser asks.'}
+                  </p>
+                </>
+              )}
+            </section>
+
+            <button
+              type="button"
+              className="solid-button"
+              disabled={!consentAccepted || isStarting || (!micHeard && !skipMicCheck)}
+              onClick={beginBaseRound}
+            >
               {isStarting ? 'Connecting...' : 'Continue to interview'}
             </button>
+            {!micHeard && !skipMicCheck ? (
+              <button type="button" className="text-link" onClick={() => setSkipMicCheck(true)}>
+                Microphone check not working? Continue anyway
+              </button>
+            ) : null}
           </>
         ) : null}
 
@@ -491,6 +661,12 @@ function InterviewWorkspace({ candidateName, resumeStage = 'base', onClose }) {
                 ? 'Answer the generated follow-up within the 2:30 window.'
                 : 'Answer naturally. The base round uses one shared five-minute timer across all base questions.'}
             </p>
+            {quietTake && !isRecording ? (
+              <p className="invite-note error" role="alert">
+                We could barely hear you on that answer. Check your microphone (the bar below should move when you
+                speak) and press <strong>Record again</strong>.
+              </p>
+            ) : null}
             <div className={isRecording ? 'recording-orb active' : 'recording-orb'} aria-hidden="true">
               <Icon name="mic" size={34} />
             </div>
@@ -503,6 +679,7 @@ function InterviewWorkspace({ candidateName, resumeStage = 'base', onClose }) {
                     ? 'Answer saved. Continue when you are ready.'
                     : 'Ready when you are.'}
             </p>
+            <MicMeter level={micLevel} small />
             {isRecording ? (
               <div className="recording-action-note" role="status">
                 <Icon name="stop" size={18} />

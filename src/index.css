@@ -6501,3 +6501,66 @@ img {
   align-items: center;
   gap: 8px;
 }
+
+/* Microphone check (NFR-05): device picker + live level meter */
+.mic-check {
+  display: grid;
+  gap: 10px;
+  margin: 16px 0;
+  padding: 14px 16px;
+  border: 1px solid #dfe5ee;
+  border-radius: 12px;
+  background: #f8fafc;
+  text-align: left;
+}
+
+.mic-check-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mic-device {
+  display: grid;
+  gap: 4px;
+  font-size: 14px;
+}
+
+.mic-device select {
+  padding: 8px 10px;
+  border: 1px solid #cfd8e3;
+  border-radius: 8px;
+  background: #fff;
+  font: inherit;
+}
+
+.mic-device-name {
+  margin: 0;
+  font-size: 14px;
+  color: #5b6b7c;
+}
+
+.mic-meter {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e3e8ef;
+}
+
+.mic-meter.small {
+  width: min(260px, 100%);
+  height: 6px;
+  margin: 8px auto 0;
+}
+
+.mic-meter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #f0a43a;
+  transition: width 0.1s linear;
+}
+
+.mic-meter span.heard {
+  background: #2e9d5b;
+}

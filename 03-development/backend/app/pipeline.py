@@ -34,6 +34,20 @@ PENDING_STATUSES = ("uploaded", "transcribing")
 # Whisper's per-segment probability that a segment is silence; above this for every
 # segment we store "no speech" instead of trusting a hallucinated transcript (FR-07).
 NO_SPEECH_THRESHOLD = 0.6
+# Whisper invents text for silent or near-silent audio. Two well-known signatures:
+# a highly repetitive loop (compression ratio above Whisper's own 2.4 limit), and
+# stock phrases learned from video subtitles. Both are dropped, never stored.
+COMPRESSION_RATIO_LIMIT = 2.4
+HALLUCINATION_PHRASES = {
+    "you", "thank you", "thank you.", "thanks", "bye", "okay",
+    "thank you for watching", "thanks for watching", "thank you so much for watching",
+    "thank you very much for watching", "thank you for watching and see you next time",
+    "please subscribe", "subscribe to my channel", "like and subscribe",
+    "thank you for listening", "see you next time",
+    "ご視聴ありがとうございました", "ありがとうございました",
+    "字幕由amara.org社区提供", "请不吝点赞 订阅 转发 打赏支持明镜与点点栏目",
+    "sous-titres réalisés par la communauté d'amara.org",
+}
 
 # Advisory-lock namespaces so two workers never run the same step for one candidate.
 _LOCK_FOLLOW_UP = 1
@@ -191,10 +205,9 @@ def _transcribe(db, resp: Response) -> None:
         budget.charge(db, budget.estimate_whisper_cost(result.duration_seconds),
                       model=model, candidate_id=cid, job_id=jid)
 
-    no_speech = not result.text or (
-        result.no_speech_prob is not None and result.no_speech_prob >= NO_SPEECH_THRESHOLD
-    )
-    resp.transcript = None if no_speech else result.text
+    spoken = speech_text(result)
+    no_speech = not spoken
+    resp.transcript = None if no_speech else spoken
     resp.no_speech_flag = no_speech
     resp.status = "no_speech" if no_speech else "transcribed"
     db.commit()
@@ -203,6 +216,33 @@ def _transcribe(db, resp: Response) -> None:
         "language": result.language, "duration_seconds": result.duration_seconds,
         "no_speech_prob": result.no_speech_prob, "no_speech": no_speech, "raw": result.raw,
     })
+
+
+def _is_hallucination(text: str) -> bool:
+    normalized = re.sub(r"[\s.!?,。、！？]+", " ", (text or "").lower()).strip()
+    return not normalized or normalized in HALLUCINATION_PHRASES or (text or "").strip().lower() in HALLUCINATION_PHRASES
+
+
+def speech_text(result) -> str:
+    """What the candidate actually said, or "" when Whisper heard no real speech (FR-07:
+    flag silence instead of fabricating a transcript). Segments that look like silence
+    (high no-speech probability), a repetition loop, or a stock subtitle phrase are dropped."""
+    segments = (result.raw or {}).get("segments") or []
+    if not segments:  # provider gave no segment detail - judge the whole text
+        if result.no_speech_prob is not None and result.no_speech_prob >= NO_SPEECH_THRESHOLD:
+            return ""
+        return "" if _is_hallucination(result.text) else (result.text or "").strip()
+    kept = []
+    for seg in segments:
+        text = (seg.get("text") or "").strip()
+        if float(seg.get("no_speech_prob") or 0.0) >= NO_SPEECH_THRESHOLD:
+            continue
+        if float(seg.get("compression_ratio") or 0.0) > COMPRESSION_RATIO_LIMIT:
+            continue
+        if _is_hallucination(text):
+            continue
+        kept.append(text)
+    return " ".join(kept).strip()
 
 
 # --- FR-08: one follow-up question -------------------------------------------

@@ -245,3 +245,28 @@ def test_provider_selection(monkeypatch):
 
     monkeypatch.setattr(settings, "ai_provider", "groq")
     assert ai_client.get_client().name == "groq"
+
+
+def test_whisper_silence_hallucinations_are_not_stored():
+    """Real Whisper output for near-silent recordings (seen in testing) must become no_speech."""
+    from app.ai_client import Transcription
+
+    def seg(text, nsp, cr, lp=-0.5):
+        return {"text": text, "no_speech_prob": nsp, "compression_ratio": cr, "avg_logprob": lp}
+
+    silent = [
+        [seg(" Thank you for watching.", 0.17, 0.74, -0.82)],
+        [seg(" Thank you so much for watching.", 0.20, 0.79, -1.0)],
+        [seg(" 7月21日 日曜日 日曜日 日曜日", 0.75, 15.9), seg("日曜日 日曜日", 0.86, 18.3)],
+        [seg(" Côte d'Ivoire", 0.86, 0.64), seg(" Côte d'Ivoire, Côte d'Ivoire", 0.77, 1.11)],
+        [seg(" ご視聴ありがとうございました", 0.30, 0.9)],
+        [seg(" you", 0.4, 0.5)],
+    ]
+    for segments in silent:
+        text = " ".join(s["text"] for s in segments)
+        assert pipeline.speech_text(Transcription(text=text, raw={"segments": segments})) == ""
+
+    real = [seg(" I built a REST API with FastAPI and Postgres.", 0.02, 1.3),
+            seg(" Thank you for watching.", 0.2, 0.7)]  # trailing hallucination dropped, speech kept
+    out = pipeline.speech_text(Transcription(text="", raw={"segments": real}))
+    assert out == "I built a REST API with FastAPI and Postgres."

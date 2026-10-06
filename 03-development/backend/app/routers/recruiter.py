@@ -22,6 +22,8 @@ from app.models import AuditLog, Candidate, Job, Recruiter, Response, Score
 from app.rbac import require_permission
 from app.roles import Permission
 from app.schemas.recruiter import (
+    AuditEvent,
+    AuditTrailResponse,
     CandidateDetail,
     CandidateInfo,
     InviteRequest,
@@ -305,3 +307,26 @@ def job_candidates(job_id: int, db: Session = Depends(get_db)) -> JobCandidatesR
         )
     items.sort(key=lambda c: (c.aggregate_score is None, -(c.aggregate_score or 0), c.candidate_id))
     return JobCandidatesResponse(job_id=job.job_id, title=job.title, candidates=items)
+
+
+@router.get(
+    "/candidates/{candidate_id}/audit",
+    response_model=AuditTrailResponse,
+    summary="Read-only audit trail for one session (FR-13)",
+    dependencies=[Depends(require_permission(Permission.VIEW_CANDIDATE))],
+)
+def candidate_audit(candidate_id: int, db: Session = Depends(get_db)) -> AuditTrailResponse:
+    """Every AI request/response and anti-cheat event, oldest first (contract #17).
+    Read-only: the table is append-only, enforced by a database trigger (NFR-01)."""
+    if db.get(Candidate, candidate_id) is None:
+        raise api_error(404, "NOT_FOUND", "No such candidate")
+    rows = db.execute(
+        select(AuditLog).where(AuditLog.candidate_id == candidate_id).order_by(AuditLog.log_id)
+    ).scalars().all()
+    return AuditTrailResponse(
+        candidate_id=candidate_id,
+        events=[
+            AuditEvent(log_id=r.log_id, event_type=r.event_type, created_at=r.created_at, payload=r.payload)
+            for r in rows
+        ],
+    )

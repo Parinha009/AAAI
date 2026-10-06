@@ -67,7 +67,7 @@ docker compose up -d db
 pytest
 ```
 
-34 tests cover: auth (magic-link, verify, single-use, anti-enumeration), the consent
+37 tests cover: auth (magic-link, verify, single-use, anti-enumeration), the consent
 gate (403 → 201 → 200), audio upload validation (201 / 413 / 415), tab-out logging +
 audit-log immutability, RBAC on `budget-status`, the budget kill-switch guard, the
 recruiter dashboard (jobs, ranked leaderboard, candidate detail, audio playback), and
@@ -102,6 +102,7 @@ python -m app.seed   # prints JOB_ID (int), CANDIDATE_EMAIL, RECRUITER_EMAIL
 | GET | `/api/v1/jobs/{id}/leaderboard` | Ranked candidates + review flags (FR-14/15) | recruiter |
 | GET | `/api/v1/candidates/{id}` | Full drill-down: transcripts, scores, audio links (FR-14/15) | recruiter |
 | GET | `/api/v1/responses/{id}/audio` | Stream one recording for playback (FR-15) | recruiter + `play_audio` |
+| GET | `/api/v1/candidates/{id}/audit` | Read-only, chronological audit trail (contract #17, FR-13) | recruiter |
 | POST | `/api/v1/jobs/{id}/invite` | **v1.1:** invite a candidate by email — creates them + emails a magic link (FR-04) | recruiter + `invite_candidate` |
 | GET | `/api/v1/jobs/{id}/candidates` | **v1.1:** every candidate for a job (scored or not) + answer counts — feeds the dashboard (FR-14) | recruiter + `view_candidate` |
 

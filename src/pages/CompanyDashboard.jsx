@@ -1,5 +1,14 @@
 import { useEffect, useState } from 'react'
-import { fetchAudioUrl, getCandidateDetail, hasSession, inviteCandidate, listJobCandidates, listJobs } from '../api'
+import {
+  fetchAudioUrl,
+  getBudgetStatus,
+  getCandidateAudit,
+  getCandidateDetail,
+  hasSession,
+  inviteCandidate,
+  listJobCandidates,
+  listJobs,
+} from '../api'
 import Icon from '../components/Icon'
 
 const menuPanels = {
@@ -432,6 +441,58 @@ const STATUS_LABELS = {
   expired: 'Expired',
 }
 
+// FR-15: every flag shows a human-readable reason, not a raw code.
+const REVIEW_REASON_TEXT = {
+  LOW_COMMUNICATION: 'Low communication score (2 or below)',
+  HIGH_TAB_OUT: 'Left the interview tab 3 or more times',
+  GRADING_FAILED: 'AI grading failed - listen and score by hand',
+  TEMPLATED_LANGUAGE: 'Templated or robotic phrasing detected',
+}
+
+function formatReviewReason(reason) {
+  if (REVIEW_REASON_TEXT[reason]) return REVIEW_REASON_TEXT[reason]
+  if (!/^[A-Z_]+$/.test(reason)) return reason
+  const words = reason.toLowerCase().replace(/_/g, ' ')
+  return words.charAt(0).toUpperCase() + words.slice(1)
+}
+
+const AI_KIND_LABELS = { transcription: 'Transcription', follow_up: 'Follow-up', scoring: 'Scoring' }
+
+// One row of GET /candidates/{id}/audit -> a readable audit-trail entry (FR-13).
+function describeAuditEvent(event) {
+  const p = event.payload || {}
+  const kind = AI_KIND_LABELS[p.kind] || 'AI'
+  let detail
+  if (event.event_type === 'CONSENT') {
+    detail = `Consent recorded (version ${p.consent_version || 'v1'}).`
+  } else if (event.event_type === 'TAB_OUT') {
+    detail = `Left the interview tab${p.question_id ? ` during question ${p.question_id}` : ''}.`
+  } else if (event.event_type === 'AI_REQUEST') {
+    detail = `${kind} request sent to ${p.model || 'the AI model'}${p.attempt > 1 ? ` (retry ${p.attempt})` : ''}.`
+  } else if (event.event_type === 'AI_RESPONSE' && p.kind === 'transcription') {
+    if (p.error) detail = `Transcription failed: ${p.error}`
+    else if (p.no_speech) detail = 'Transcription: no speech detected.'
+    else detail = `Transcript received${p.duration_seconds ? ` (${Math.round(p.duration_seconds)}s of audio)` : ''}.`
+  } else if (event.event_type === 'AI_RESPONSE' && p.kind === 'follow_up') {
+    const fallback = p.source === 'fallback' ? ` (fallback question: ${p.reason || 'AI unavailable'})` : ''
+    detail = `Follow-up question issued${fallback}: "${p.question}"`
+  } else if (event.event_type === 'AI_RESPONSE' && p.kind === 'scoring') {
+    detail = p.valid
+      ? `Scorecard accepted (attempt ${p.attempt}).`
+      : `Scorecard rejected (attempt ${p.attempt}): ${p.error || 'invalid reply'}`
+  } else if (event.event_type === 'BUDGET_FREEZE') {
+    detail = `AI paused: the $${p.ceiling_usd} monthly budget was reached.`
+  } else {
+    detail = JSON.stringify(p).slice(0, 200)
+  }
+  return {
+    logId: event.log_id,
+    type: event.event_type,
+    time: new Date(event.created_at).toLocaleString(),
+    detail,
+  }
+}
+
 // GET /jobs/{id}/candidates row -> the shape the leaderboard renders.
 function mapLiveCandidate(c, jobTitle) {
   const scored = c.aggregate_score !== null && c.aggregate_score !== undefined
@@ -462,7 +523,7 @@ function mapLiveCandidate(c, jobTitle) {
 }
 
 // GET /candidates/{id} -> the shape the detail drawer renders.
-function mapLiveDetail(base, detail) {
+function mapLiveDetail(base, detail, audit) {
   const rationale = detail.score?.rationale || {}
   return {
     ...base,
@@ -477,14 +538,16 @@ function mapLiveDetail(base, detail) {
       question: r.question_text || (r.type === 'follow_up' ? 'Follow-up question' : `Question ${r.question_id}`),
       text: r.transcript || (r.no_speech_flag
         ? 'No speech detected.'
-        : 'Transcript pending - AI transcription runs in a later slice.'),
+        : 'Transcript not available yet - still processing, or transcription failed.'),
       audioPath: r.audio_url,
     })),
-    auditEvents: [{
-      type: 'TAB_OUT',
-      time: `${detail.tab_out_count} logged`,
-      detail: `${detail.tab_out_count} tab switch(es) recorded in the immutable audit trail.`,
-    }],
+    auditEvents: audit?.events
+      ? audit.events.map(describeAuditEvent)
+      : [{
+        type: 'TAB_OUT',
+        time: `${detail.tab_out_count} logged`,
+        detail: `${detail.tab_out_count} tab switch(es) recorded in the immutable audit trail.`,
+      }],
   }
 }
 
@@ -909,14 +972,18 @@ function CandidateDetailDrawer({ candidate, onClose }) {
             <div>
               <strong>Needs manual review</strong>
               {reviewReasons.map((reason) => (
-                <span className="review-reason-chip" key={reason}>{reason}</span>
+                <span className="review-reason-chip" key={reason}>{formatReviewReason(reason)}</span>
               ))}
             </div>
           </section>
         ) : null}
 
         {!candidate.traits.length ? (
-          <p className="invite-note">Not scored yet - AI scoring runs in a later slice.</p>
+          <p className="invite-note">
+            {candidate.reviewReasons?.includes('GRADING_FAILED')
+              ? 'AI grading failed twice - listen to the recordings and score by hand.'
+              : 'Not scored yet - scoring runs once the follow-up answer is transcribed.'}
+          </p>
         ) : null}
 
         <section className="trait-grid" aria-label="Trait scores">
@@ -965,8 +1032,11 @@ function CandidateDetailDrawer({ candidate, onClose }) {
 
         <section className="audit-trail-list">
           <h3>Immutable audit trail</h3>
-          {candidate.auditEvents.map((event) => (
-            <article className="audit-trail-row" key={`${candidate.id}-${event.type}-${event.time}`}>
+          {!candidate.loading && !candidate.auditEvents.length ? (
+            <p className="invite-note">No audit events recorded yet.</p>
+          ) : null}
+          {candidate.auditEvents.map((event, index) => (
+            <article className="audit-trail-row" key={`${candidate.id}-${event.logId ?? index}`}>
               <span>{event.type}</span>
               <div>
                 <strong>{event.time}</strong>
@@ -994,12 +1064,16 @@ export default function CompanyDashboard({ user, onBackToLanding, onOpenLogin, o
   const [selectedCandidate, setSelectedCandidate] = useState(null)
   const [liveProjects, setLiveProjects] = useState([])
   const [liveLeaderboards, setLiveLeaderboards] = useState({})
+  const [budget, setBudget] = useState(null)
   const [jobTitle, setJobTitle] = useState('')
   const [projectName, setProjectName] = useState('')
   const profile = user || { name: 'Ben', email: 'ben@gmail.com' }
   const initial = (profile.name || 'B').charAt(0).toUpperCase()
   const organizationLabel = organizationName.trim() || 'KIT'
-  const visibleProjects = [...liveProjects, ...projects, ...customProjects]
+  // Connected to the server: show only real jobs. Offline: the demo projects.
+  const visibleProjects = liveProjects.length
+    ? [...liveProjects, ...customProjects]
+    : [...projects, ...customProjects]
   const project = visibleProjects.find((item) => item.jobId === selectedJobId) || visibleProjects[0]
   const rankedCandidates = [...(liveLeaderboards[project.jobId] || candidateLeaderboards[project.jobId] || [])]
     .sort((first, second) => (second.scored === false ? -1 : second.aggregateScore)
@@ -1011,7 +1085,7 @@ export default function CompanyDashboard({ user, onBackToLanding, onOpenLogin, o
       candidate.role,
       candidate.status,
       candidate.confidence,
-      ...candidate.reviewReasons,
+      ...candidate.reviewReasons.map(formatReviewReason),
     ].some((value) => value.toLowerCase().includes(normalizedSearch)))
     : rankedCandidates
   const needsReviewCount = rankedCandidates.filter((candidate) => candidate.review).length
@@ -1075,6 +1149,23 @@ export default function CompanyDashboard({ user, onBackToLanding, onOpenLogin, o
     }
   }, [])
 
+  // FR-16: poll the budget so the "AI paused" banner appears without a reload.
+  useEffect(() => {
+    if (!hasSession()) {
+      return undefined
+    }
+    let cancelled = false
+    const load = () => getBudgetStatus()
+      .then((data) => { if (!cancelled) setBudget(data) })
+      .catch(() => {})
+    load()
+    const intervalId = window.setInterval(load, 60000)
+    return () => {
+      cancelled = true
+      window.clearInterval(intervalId)
+    }
+  }, [])
+
   const handleReviewCandidate = async (candidate) => {
     if (!candidate.live) {
       setSelectedCandidate(candidate)
@@ -1082,8 +1173,11 @@ export default function CompanyDashboard({ user, onBackToLanding, onOpenLogin, o
     }
     setSelectedCandidate({ ...candidate, loading: true })
     try {
-      const detail = await getCandidateDetail(candidate.apiCandidateId)
-      setSelectedCandidate(mapLiveDetail(candidate, detail))
+      const [detail, audit] = await Promise.all([
+        getCandidateDetail(candidate.apiCandidateId),
+        getCandidateAudit(candidate.apiCandidateId).catch(() => null),
+      ])
+      setSelectedCandidate(mapLiveDetail(candidate, detail, audit))
     } catch (error) {
       setSelectedCandidate({ ...candidate, loading: false, detailError: error.message })
     }
@@ -1374,6 +1468,20 @@ export default function CompanyDashboard({ user, onBackToLanding, onOpenLogin, o
 
         {projectStatus === 'active' ? (
           <>
+            {budget?.status === 'paused' ? (
+              <div className="budget-banner" role="alert">
+                <Icon name="flag" />
+                <div>
+                  <strong>AI paused due to budget cap</strong>
+                  <span>
+                    Estimated spend ${Number(budget.estimated_spend_usd).toFixed(2)} has reached the
+                    ${Number(budget.ceiling_usd).toFixed(2)} monthly ceiling ({budget.month}). Interviews are still
+                    recorded, but transcription, follow-ups and scoring are paused until next month.
+                  </span>
+                </div>
+              </div>
+            ) : null}
+
             <InterviewPageTabs activePage={activeInterviewPage} onChange={openInterviewPage} />
 
             {activeInterviewPage === 'dashboard' ? (

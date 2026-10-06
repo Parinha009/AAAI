@@ -109,3 +109,23 @@ def test_job_candidates_lists_scored_and_unscored(client, recruiter_headers, can
     assert by_id[new_candidate["candidate_id"]]["aggregate_score"] is None    # not scored yet — never faked
     # candidates can't list other candidates
     assert client.get(f"{API}/jobs/{job_id}/candidates", headers=candidate_headers).status_code == 403
+
+
+def test_candidate_audit_trail(client, candidate_headers, new_candidate, recruiter_headers):
+    from tests.conftest import consent
+
+    consent(client, candidate_headers)
+    client.post(f"{API}/interview/events/tab-out", headers=candidate_headers, json={"question_id": 1})
+    cid = new_candidate["candidate_id"]
+
+    r = client.get(f"{API}/candidates/{cid}/audit", headers=recruiter_headers)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["candidate_id"] == cid
+    types = [e["event_type"] for e in body["events"]]
+    assert types == ["CONSENT", "TAB_OUT"]  # chronological
+    ids = [e["log_id"] for e in body["events"]]
+    assert ids == sorted(ids)
+
+    assert client.get(f"{API}/candidates/999999/audit", headers=recruiter_headers).status_code == 404
+    assert client.get(f"{API}/candidates/{cid}/audit", headers=candidate_headers).status_code == 403

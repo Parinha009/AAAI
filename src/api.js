@@ -115,6 +115,16 @@ export function getCandidateDetail(candidateId) {
 
 // The audio endpoint needs the Bearer token, which a plain <audio src> can't
 // send — so fetch the recording as a Blob and hand back a playable object URL.
+// FR-13: read-only audit trail for one candidate (contract #17).
+export function getCandidateAudit(candidateId) {
+  return fetch(`${API_BASE}/candidates/${candidateId}/audit`, { headers: authHeaders() }).then(parse)
+}
+
+// FR-16: { status: 'ok' | 'paused', month, estimated_spend_usd, ceiling_usd } — drives the banner.
+export function getBudgetStatus() {
+  return fetch(`${API_BASE}/system/budget-status`, { headers: authHeaders() }).then(parse)
+}
+
 export async function fetchAudioUrl(audioPath) {
   const res = await fetch(`${API_ORIGIN}${audioPath}`, { headers: authHeaders() })
   if (!res.ok) {

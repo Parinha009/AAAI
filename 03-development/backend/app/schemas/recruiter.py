@@ -120,3 +120,16 @@ class JobCandidatesResponse(BaseModel):
     job_id: int
     title: str
     candidates: list[JobCandidate]
+
+
+# --- GET /candidates/{id}/audit (#17, FR-13) — read-only, chronological ---
+class AuditEvent(BaseModel):
+    log_id: int
+    event_type: str
+    created_at: datetime
+    payload: dict | None = None
+
+
+class AuditTrailResponse(BaseModel):
+    candidate_id: int
+    events: list[AuditEvent]

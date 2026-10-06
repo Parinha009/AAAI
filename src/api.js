@@ -56,6 +56,11 @@ export function postConsent() {
   }).then(parse)
 }
 
+// FR-17 — which screen to show: { candidate_status, stage, next_action }.
+export function getInterviewStatus() {
+  return fetch(`${API_BASE}/interview/status`, { headers: authHeaders() }).then(parse)
+}
+
 // FR-05 — ordered base questions + the 5:00 timer.
 export function getQuestions() {
   return fetch(`${API_BASE}/interview/questions`, { headers: authHeaders() }).then(parse)

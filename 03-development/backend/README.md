@@ -81,8 +81,14 @@ All routes are under **`/api/v1`**. Every non-2xx response uses the standard
 envelope `{ "error": { "code", "message", "details" } }`. Seed demo data first:
 
 ```bash
-python -m app.seed   # prints JOB_ID (int), CANDIDATE_EMAIL, RECRUITER_EMAIL
+python -m app.seed   # the Lead's job + rubric, plus logins (see below)
 ```
+
+The seed creates **real data only**: the Lead-authored job/rubric/questions, plus
+`SEED_REAL_EMAIL` (from `.env`) as recruiter and its `+candidate` alias as candidate. If
+`SEED_REAL_EMAIL` is empty it falls back to `recruiter@demo.local` / `candidate@demo.local`
+(never emailed — the sign-in link is printed in the backend console). No fake scored
+candidates are seeded; every score comes from the AI pipeline.
 
 | Method | Route | Purpose | Auth |
 |--------|-------|---------|------|

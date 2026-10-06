@@ -7,21 +7,28 @@ import Landing from './pages/Landing'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 
-const existingAccounts = new Set([
-  'alex@aaai.ai',
-  'demo@aaai.ai',
-  'candidate@example.com',
-  'recruiter@example.com',
-  'ben@gmail.com',
-])
+// Real sessions only. The session token comes from POST /auth/verify; the profile is
+// just the email the user typed when requesting the link (the API has no names).
+const SESSION_KEY = 'aaai_session'
+const PROFILE_KEY = 'aaai_profile'
+const PENDING_EMAIL_KEY = 'aaai_pending_email'
 
-const accountProfiles = new Map([
-  ['alex@aaai.ai', { name: 'Alex', email: 'alex@aaai.ai' }],
-  ['demo@aaai.ai', { name: 'Demo', email: 'demo@aaai.ai' }],
-  ['candidate@example.com', { name: 'Candidate', email: 'candidate@example.com' }],
-  ['recruiter@example.com', { name: 'Recruiter', email: 'recruiter@example.com' }],
-  ['ben@gmail.com', { name: 'Ben', email: 'ben@gmail.com' }],
-])
+const storage = {
+  get(key) {
+    try { return window.localStorage.getItem(key) } catch { return null }
+  },
+  set(key, value) {
+    try { window.localStorage.setItem(key, value) } catch { /* private mode: session-only */ }
+  },
+  remove(key) {
+    try { window.localStorage.removeItem(key) } catch { /* ignore */ }
+  },
+}
+
+const profileFromEmail = (email, role) => ({
+  name: email ? email.split('@')[0] : (role === 'recruiter' ? 'Recruiter' : 'Candidate'),
+  email: email || '',
+})
 
 const emptyForm = {
   fullName: '',
@@ -88,6 +95,24 @@ export default function App() {
   useEffect(() => {
     const token = new URLSearchParams(window.location.search).get('token')
     if (!token) {
+      // No link in the URL: restore a still-valid session after a page reload.
+      const saved = storage.get(SESSION_KEY)
+      if (!saved) {
+        return
+      }
+      getMe(saved)
+        .then((me) => {
+          const dashboard = me.role === 'recruiter' ? 'company' : 'candidate'
+          let profile = null
+          try { profile = JSON.parse(storage.get(PROFILE_KEY) || 'null') } catch { profile = null }
+          setCurrentUser(profile || profileFromEmail('', me.role))
+          setCurrentRole(dashboard)
+          setMode(dashboard)
+        })
+        .catch(() => {
+          storage.remove(SESSION_KEY)
+          storage.remove(PROFILE_KEY)
+        })
       return
     }
     // Strip the token from the URL so a refresh/bookmark can't reuse it.
@@ -96,9 +121,12 @@ export default function App() {
       try {
         const session = await verifyToken(token)
         await getMe(session.session_token)
-        localStorage.setItem('aaai_session', session.session_token)
+        storage.set(SESSION_KEY, session.session_token)
         const dashboard = session.role === 'recruiter' ? 'company' : 'candidate'
-        setCurrentUser({ name: session.role === 'recruiter' ? 'Recruiter' : 'Candidate', email: '' })
+        const profile = profileFromEmail(storage.get(PENDING_EMAIL_KEY) || '', session.role)
+        storage.set(PROFILE_KEY, JSON.stringify(profile))
+        storage.remove(PENDING_EMAIL_KEY)
+        setCurrentUser(profile)
         setCurrentRole(dashboard)
         setMode(dashboard)
         showToast('success', 'Signed in', `Verified by the server as ${session.role}.`)
@@ -154,6 +182,7 @@ export default function App() {
       // SRS-FR-04: the server emails a one-time link; signing in happens only when
       // that link is opened (/auth/callback?token=...). The token never reaches this page.
       const res = await requestMagicLink(email)
+      storage.set(PENDING_EMAIL_KEY, email)
       setFormData((current) => ({ ...current, email }))
       setMagicLinkRequest({
         email,
@@ -168,46 +197,6 @@ export default function App() {
     } finally {
       setLoadingAction('')
     }
-  }
-
-  const handleSignup = (event) => {
-    event.preventDefault()
-    const fullName = formData.fullName.trim()
-    const email = normalizeEmail(formData.email)
-
-    if (!fullName) {
-      setAuthNotice('Add your full name so your profile feels complete.')
-      showToast('error', 'Full name required', 'Add the name you want hiring teams to see.')
-      return
-    }
-
-    if (!isValidEmail(email)) {
-      setAuthNotice('Enter a valid email to create your account.')
-      showToast('error', 'Email needs a second look', 'Use a valid email address for your account.')
-      return
-    }
-
-    if (!formData.acceptTerms) {
-      setAuthNotice('Accept the screening terms before we email your sign-in link.')
-      showToast('error', 'Terms required', 'Confirm the screening terms to finish account setup.')
-      return
-    }
-
-    setLoadingAction('signup')
-    setAuthNotice('')
-
-    window.setTimeout(() => {
-      setFormData((current) => ({ ...current, email, fullName }))
-      setMagicLinkRequest({
-        email,
-        name: fullName,
-        role: authRole,
-        source: 'signup',
-      })
-      setAuthNotice('Check your inbox to finish signing in. No password is required.')
-      showToast('success', 'Magic link sent', `Check ${email} to verify your account.`)
-      setLoadingAction('')
-    }, 760)
   }
 
   const handleResendMagicLink = async () => {
@@ -244,6 +233,8 @@ export default function App() {
   const handleLogout = () => {
     const name = currentUser?.name?.split(' ')[0] || 'Account'
 
+    storage.remove(SESSION_KEY)
+    storage.remove(PROFILE_KEY)
     setCurrentUser(null)
     setCurrentRole('candidate')
     setAuthRole('candidate')
@@ -302,17 +293,7 @@ export default function App() {
         />
       ) : mode === 'signup' ? (
         <Signup
-          authRole={authRole}
-          formData={formData}
-          isLoading={loadingAction === 'signup'}
-          loadingAction={loadingAction}
-          magicLinkRequest={magicLinkRequest}
-          notice={authNotice}
-          onChange={handleChange}
-          onChangeEmail={handleChangeAuthEmail}
           onGoToLanding={handleGoLanding}
-          onResendMagicLink={handleResendMagicLink}
-          onSubmit={handleSignup}
           onSwitchToLogin={() => openLogin({ email: formData.email, role: authRole })}
         />
       ) : mode === 'company' ? (
@@ -328,7 +309,6 @@ export default function App() {
           onBackToLanding={handleGoLanding}
           onLogout={handleLogout}
           onOpenLogin={() => openLogin({ role: 'candidate' })}
-          onOpenSignup={() => openSignup({ role: 'candidate' })}
         />
       ) : (
         <Landing

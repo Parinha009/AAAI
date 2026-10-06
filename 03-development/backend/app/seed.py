@@ -11,11 +11,9 @@ these are tunable *values*, not frozen shapes: editing wording here is not a
 contract change.
 """
 
-from datetime import datetime, timezone
-
 from app.config import settings
 from app.database import SessionLocal
-from app.models import AuditLog, Candidate, Job, Recruiter, Response, Score
+from app.models import Candidate, Job, Recruiter
 
 DEMO_TITLE = "Junior Backend Engineer"
 # Title used by the pre-rubric seed; looked up so an existing row is upgraded in
@@ -178,47 +176,22 @@ def main() -> None:
         print(f"JOB_TITLE: {job.title}")
         print(f"QUESTIONS: {len(job.base_questions)}  RUBRIC_TRAITS: {len(job.rubric_config['traits'])}")
 
-        candidate = (
-            db.query(Candidate)
-            .filter(Candidate.email == DEMO_CANDIDATE_EMAIL, Candidate.job_id == job.job_id)
-            .first()
-        )
-        if candidate is None:
-            candidate = Candidate(
-                job_id=job.job_id, email=DEMO_CANDIDATE_EMAIL, name="Demo Candidate", status="invited"
-            )
-            db.add(candidate)
-            db.commit()
-            db.refresh(candidate)
-            print("Created demo candidate.")
-        else:
-            print("Demo candidate already exists.")
-        print(f"CANDIDATE_EMAIL: {candidate.email}")
-
-        recruiter = db.query(Recruiter).filter(Recruiter.email == DEMO_RECRUITER_EMAIL).first()
-        if recruiter is None:
-            recruiter = Recruiter(email=DEMO_RECRUITER_EMAIL, name="Demo Recruiter")
-            db.add(recruiter)
-            db.commit()
-            db.refresh(recruiter)
-            print("Created demo recruiter.")
-        else:
-            print("Demo recruiter already exists.")
-        print(f"RECRUITER_EMAIL: {recruiter.email}")
-
-        _seed_real_inbox(db, job)
-        _seed_scored_candidates(db, job)
+        # Real data only: with SEED_REAL_EMAIL set (in .env), only that real inbox is
+        # provisioned. The reserved-domain demo accounts are a fallback for teammates
+        # who have no real inbox configured; no fake scored candidates are ever seeded.
+        if not _seed_real_inbox(db, job):
+            _seed_demo_accounts(db, job)
     finally:
         db.close()
 
 
-def _seed_real_inbox(db, job) -> None:
+def _seed_real_inbox(db, job) -> bool:
     """If SEED_REAL_EMAIL is set in .env, provision it so magic links reach a real
     inbox: the address itself as a recruiter, and its "+candidate" alias as a
     candidate (Gmail delivers +aliases to the same inbox)."""
     email = settings.seed_real_email.strip().lower()
     if not email or "@" not in email:
-        return
+        return False
     local, domain = email.split("@", 1)
     cand_email = f"{local}+candidate@{domain}"
 
@@ -229,56 +202,19 @@ def _seed_real_inbox(db, job) -> None:
     db.commit()
     print(f"REAL_RECRUITER_EMAIL: {email}")
     print(f"REAL_CANDIDATE_EMAIL: {cand_email}")
+    return True
 
 
-def _seed_scored_candidates(db, job) -> None:
-    """Two demo candidates with scores so the recruiter leaderboard has data.
-    (Stands in until the real AI scoring pipeline exists.)"""
-    demos = [
-        {
-            "email": "dara@demo.local", "name": "Dara Chen",
-            "scores": (4, 5, 4, 4), "review": False, "tab_outs": 0,
-            "rationale": {
-                "technical_skill": "Explained a load-dependent race condition clearly.",
-                "communication": "Natural, specific phrasing.",
-                "problem_solving": "Isolated the fault methodically.",
-                "job_fit": "Relevant backend experience.",
-            },
-        },
-        {
-            "email": "pisey@demo.local", "name": "Sok Pisey",
-            "scores": (3, 2, 3, 3), "review": False, "tab_outs": 4,
-            "rationale": {
-                "technical_skill": "Some gaps in depth.",
-                "communication": "Templated, textbook phrasing detected.",
-                "problem_solving": "Adequate.",
-                "job_fit": "Partial match.",
-            },
-        },
-    ]
-    now = datetime.now(timezone.utc)
-    for d in demos:
-        if db.query(Candidate).filter(Candidate.email == d["email"], Candidate.job_id == job.job_id).first():
-            continue
-        cand = Candidate(job_id=job.job_id, email=d["email"], name=d["name"],
-                         status="completed", consent_at=now, consent_version="v1")
-        db.add(cand)
-        db.commit()
-        db.refresh(cand)
-
-        for i, q in enumerate((job.base_questions or [])[:2], start=1):
-            db.add(Response(candidate_id=cand.candidate_id, job_id=job.job_id, question_id=i,
-                            type="base", status="transcribed",
-                            transcript=f"[demo] answer to question {i}."))
-        ts, comm, ps, jf = d["scores"]
-        db.add(Score(candidate_id=cand.candidate_id, job_id=job.job_id,
-                     technical_skill=ts, communication=comm, problem_solving=ps, job_fit=jf,
-                     rationale=d["rationale"], manual_review_flag=d["review"]))
-        for _ in range(d["tab_outs"]):
-            db.add(AuditLog(candidate_id=cand.candidate_id, job_id=job.job_id,
-                            event_type="TAB_OUT", payload={"seed": True}))
-        db.commit()
-        print(f"Created scored demo candidate: {d['name']}")
+def _seed_demo_accounts(db, job) -> None:
+    """Fallback logins on a reserved domain (never emailed - the sign-in link is
+    printed in the backend console). Used only when SEED_REAL_EMAIL is not set."""
+    if db.query(Candidate).filter(Candidate.email == DEMO_CANDIDATE_EMAIL, Candidate.job_id == job.job_id).first() is None:
+        db.add(Candidate(job_id=job.job_id, email=DEMO_CANDIDATE_EMAIL, name="Demo Candidate", status="invited"))
+    if db.query(Recruiter).filter(Recruiter.email == DEMO_RECRUITER_EMAIL).first() is None:
+        db.add(Recruiter(email=DEMO_RECRUITER_EMAIL, name="Demo Recruiter"))
+    db.commit()
+    print(f"CANDIDATE_EMAIL: {DEMO_CANDIDATE_EMAIL}")
+    print(f"RECRUITER_EMAIL: {DEMO_RECRUITER_EMAIL}")
 
 
 if __name__ == "__main__":

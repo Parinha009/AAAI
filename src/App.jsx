@@ -29,7 +29,9 @@ const storage = {
 const profileFromMe = (me, fallbackEmail) => {
   const email = me?.email || fallbackEmail || ''
   const name = (me?.name || '').trim()
-  return name ? { name, email } : profileFromEmail(email, me?.role)
+  const base = name ? { name, email } : profileFromEmail(email, me?.role)
+  // Candidates: who invited them and for which job (shown on the candidate page).
+  return { ...base, invitedBy: me?.invited_by || '', jobTitle: me?.job_title || '' }
 }
 
 const profileFromEmail = (email, role) => ({

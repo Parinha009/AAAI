@@ -176,3 +176,38 @@ def test_wrong_account_type_gets_403(client, recruiter_headers, candidate_header
     versa) is refused with 403, which the UI turns into a 'signed in as...' screen."""
     assert client.get(f"{API}/interview/status", headers=recruiter_headers).status_code == 403
     assert client.get(f"{API}/jobs", headers=candidate_headers).status_code == 403
+
+
+def test_recruiter_decision_and_invited_by(client, job_id, recruiter_headers, candidate_headers, login):
+    """AI suggests, people decide: shortlist / reject / clear, with an audit row each time.
+    The invite records who sent it, and the candidate sees it."""
+    import uuid
+
+    email = f"decide-{uuid.uuid4().hex[:8]}@test.local"
+    inv = client.post(f"{API}/jobs/{job_id}/invite", headers=recruiter_headers, json={"email": email, "name": "Dee"})
+    cid = inv.json()["candidate_id"]
+
+    me = client.get(f"{API}/auth/me", headers={"Authorization": f"Bearer {login(email)}"}).json()
+    assert me["invited_by"] in ("Demo Recruiter", "recruiter@demo.local") and me["job_title"]
+
+    r = client.put(f"{API}/candidates/{cid}/decision", headers=recruiter_headers, json={"decision": "shortlisted"})
+    assert r.status_code == 200 and r.json()["decision"] == "shortlisted" and r.json()["decided_by"]
+    row = next(c for c in client.get(f"{API}/jobs/{job_id}/candidates", headers=recruiter_headers).json()["candidates"]
+               if c["candidate_id"] == cid)
+    assert row["decision"] == "shortlisted" and row["invited_by"]
+
+    assert client.put(f"{API}/candidates/{cid}/decision", headers=recruiter_headers,
+                      json={"decision": "rejected"}).json()["decision"] == "rejected"
+    cleared = client.put(f"{API}/candidates/{cid}/decision", headers=recruiter_headers, json={"decision": None}).json()
+    assert cleared["decision"] is None and cleared["decided_by"] is None
+
+    # every change is kept in the append-only audit trail
+    events = client.get(f"{API}/candidates/{cid}/audit", headers=recruiter_headers).json()["events"]
+    assert [e["payload"]["decision"] for e in events if e["event_type"] == "DECISION"] == ["shortlisted", "rejected", None]
+
+    assert client.put(f"{API}/candidates/{cid}/decision", headers=recruiter_headers,
+                      json={"decision": "maybe"}).status_code == 422
+    assert client.put(f"{API}/candidates/{cid}/decision", headers=candidate_headers,
+                      json={"decision": "shortlisted"}).status_code == 403
+    assert client.put(f"{API}/candidates/999999/decision", headers=recruiter_headers,
+                      json={"decision": "shortlisted"}).status_code == 404

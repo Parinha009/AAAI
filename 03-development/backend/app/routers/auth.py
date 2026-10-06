@@ -10,7 +10,7 @@ from app.config import settings
 from app.database import get_db
 from app.errors import api_error
 from app.magic_links import hash_token, issue_magic_link
-from app.models import Candidate, MagicLinkToken, Recruiter
+from app.models import Candidate, Job, MagicLinkToken, Recruiter
 from app.schemas.auth import (
     MagicLinkRequest,
     MagicLinkResponse,
@@ -122,10 +122,14 @@ def me(session: dict = Depends(get_session), db: Session = Depends(get_db)) -> M
         candidate = db.get(Candidate, int(session["sub"]))
         if candidate is None:
             raise api_error(401, "UNAUTHORIZED", "Candidate not found")
+        inviter = db.get(Recruiter, candidate.invited_by_recruiter_id) if candidate.invited_by_recruiter_id else None
+        job = db.get(Job, candidate.job_id)
         return MeResponse(
             role="candidate",
             name=candidate.name,
             email=candidate.email,
+            invited_by=(inviter.name or inviter.email) if inviter else None,
+            job_title=job.title if job else None,
             candidate_id=candidate.candidate_id,
             job_id=candidate.job_id,
             candidate_status=candidate.status,

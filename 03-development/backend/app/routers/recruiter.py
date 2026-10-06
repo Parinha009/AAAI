@@ -6,6 +6,7 @@ communication <= 2, tab_out_count >= 3, or a grading failure.
 """
 
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, status
@@ -26,6 +27,8 @@ from app.schemas.recruiter import (
     AuditTrailResponse,
     CandidateDetail,
     CandidateInfo,
+    DecisionRequest,
+    DecisionResponse,
     InviteRequest,
     InviteResponse,
     JobCandidate,
@@ -67,6 +70,31 @@ def _review_reasons(score: Score | None, tab_out_count: int, grading_failed: boo
     if grading_failed or (score is not None and score.manual_review_flag):
         reasons.append("GRADING_FAILED")
     return reasons
+
+
+def _recruiter_label(db: Session, recruiter_id: int | None) -> str | None:
+    """How a recruiter is shown: their name, else their email."""
+    if recruiter_id is None:
+        return None
+    recruiter = db.get(Recruiter, recruiter_id)
+    return (recruiter.name or recruiter.email) if recruiter else None
+
+
+def _acting_recruiter_id(db: Session, session: dict) -> int | None:
+    """The signed-in recruiter (sessions are role-scoped; admins are not issued yet)."""
+    if session.get("role") != "recruiter":
+        return None
+    recruiter = db.get(Recruiter, int(session["sub"]))
+    return recruiter.recruiter_id if recruiter else None
+
+
+def _decision_fields(db: Session, cand: Candidate) -> dict:
+    return {
+        "invited_by": _recruiter_label(db, cand.invited_by_recruiter_id),
+        "decision": cand.decision,
+        "decided_at": cand.decided_at,
+        "decided_by": _recruiter_label(db, cand.decided_by_recruiter_id),
+    }
 
 
 def _aggregate(score: Score) -> int:
@@ -192,6 +220,7 @@ def candidate_detail(candidate_id: int, db: Session = Depends(get_db)) -> Candid
             email=cand.email,
             status=cand.status,
             consent_at=cand.consent_at,
+            **_decision_fields(db, cand),
         ),
         job=JobInfo(job_id=job.job_id, title=job.title) if job else JobInfo(job_id=cand.job_id, title=""),
         responses=resp_out,
@@ -222,9 +251,13 @@ def response_audio(response_id: int, db: Session = Depends(get_db)) -> FileRespo
     response_model_exclude_none=True,  # hide dev_* helpers in production
     status_code=status.HTTP_201_CREATED,
     summary="Invite a candidate to a job — emails them a magic link (FR-04)",
-    dependencies=[Depends(require_permission(Permission.INVITE_CANDIDATE))],
 )
-def invite_candidate(job_id: int, payload: InviteRequest, db: Session = Depends(get_db)) -> InviteResponse:
+def invite_candidate(
+    job_id: int,
+    payload: InviteRequest,
+    db: Session = Depends(get_db),
+    session: dict = Depends(require_permission(Permission.INVITE_CANDIDATE)),
+) -> InviteResponse:
     """Candidates are invited by a recruiter, never self-registered (SRS-2.3 / FR-04).
     Creates the candidate for this job and emails a single-use sign-in link.
     Re-inviting the same email while their interview is still open just re-sends the
@@ -249,7 +282,8 @@ def invite_candidate(job_id: int, payload: InviteRequest, db: Session = Depends(
     new_interview = latest is not None and latest.status in FINISHED_STATUSES
     if latest is None or new_interview:
         candidate = Candidate(
-            job_id=job_id, email=email, name=payload.name or (latest.name if latest else None), status="invited"
+            job_id=job_id, email=email, name=payload.name or (latest.name if latest else None), status="invited",
+            invited_by_recruiter_id=_acting_recruiter_id(db, session),
         )
         db.add(candidate)
         db.commit()
@@ -316,6 +350,7 @@ def job_candidates(job_id: int, db: Session = Depends(get_db)) -> JobCandidatesR
                 tab_out_count=toc,
                 needs_review=bool(reasons),
                 review_reasons=reasons,
+                **_decision_fields(db, cand),
             )
         )
     items.sort(key=lambda c: (c.aggregate_score is None, -(c.aggregate_score or 0), c.candidate_id))
@@ -342,4 +377,53 @@ def candidate_audit(candidate_id: int, db: Session = Depends(get_db)) -> AuditTr
             AuditEvent(log_id=r.log_id, event_type=r.event_type, created_at=r.created_at, payload=r.payload)
             for r in rows
         ],
+    )
+
+
+DECISIONS = ("shortlisted", "rejected")
+
+
+@router.put(
+    "/candidates/{candidate_id}/decision",
+    response_model=DecisionResponse,
+    summary="Record the human decision: shortlist / reject / clear (v1.1, FR-15)",
+)
+def set_decision(
+    candidate_id: int,
+    payload: DecisionRequest,
+    db: Session = Depends(get_db),
+    session: dict = Depends(require_permission(Permission.DECIDE_CANDIDATE)),
+) -> DecisionResponse:
+    """AI suggests, people decide. Each change is also appended to the audit trail
+    (DECISION), so the history of who decided what - and when - can never be edited."""
+    cand = db.get(Candidate, candidate_id)
+    if cand is None:
+        raise api_error(404, "NOT_FOUND", "No such candidate")
+    decision = (payload.decision or "").strip().lower() or None
+    if decision is not None and decision not in DECISIONS:
+        raise api_error(422, "VALIDATION_ERROR", "decision must be 'shortlisted', 'rejected' or null",
+                        {"field": "decision"})
+
+    recruiter_id = _acting_recruiter_id(db, session)
+    previous = cand.decision
+    cand.decision = decision
+    cand.decided_at = datetime.now(timezone.utc) if decision else None
+    cand.decided_by_recruiter_id = recruiter_id if decision else None
+    db.add(AuditLog(
+        candidate_id=cand.candidate_id,
+        job_id=cand.job_id,
+        event_type="DECISION",
+        payload={
+            "decision": decision,
+            "previous": previous,
+            "by": _recruiter_label(db, recruiter_id),
+        },
+    ))
+    db.commit()
+    db.refresh(cand)
+    return DecisionResponse(
+        candidate_id=cand.candidate_id,
+        decision=cand.decision,
+        decided_at=cand.decided_at,
+        decided_by=_recruiter_label(db, cand.decided_by_recruiter_id),
     )

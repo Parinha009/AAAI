@@ -129,6 +129,15 @@ export function getCandidateAudit(candidateId) {
   return fetch(`${API_BASE}/candidates/${candidateId}/audit`, { headers: authHeaders() }).then(parse)
 }
 
+// The human decision (v1.1): 'shortlisted' | 'rejected' | null to clear.
+export function setCandidateDecision(candidateId, decision) {
+  return fetch(`${API_BASE}/candidates/${candidateId}/decision`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ decision }),
+  }).then(parse)
+}
+
 // FR-16: { status: 'ok' | 'paused', month, estimated_spend_usd, ceiling_usd } — drives the banner.
 export function getBudgetStatus() {
   return fetch(`${API_BASE}/system/budget-status`, { headers: authHeaders() }).then(parse)

@@ -4,6 +4,7 @@ import {
   getBudgetStatus,
   getCandidateAudit,
   getCandidateDetail,
+  setCandidateDecision,
   hasSession,
   inviteCandidate,
   listJobCandidates,
@@ -94,7 +95,10 @@ function formatReviewReason(reason) {
   return words.charAt(0).toUpperCase() + words.slice(1)
 }
 
+const DECISION_LABELS = { shortlisted: 'Shortlisted', rejected: 'Rejected' }
+
 const AUDIT_TYPE_LABELS = {
+  DECISION: 'Decision',
   CONSENT: 'Consent',
   TAB_OUT: 'Tab switch',
   AI_REQUEST: 'AI request',
@@ -126,6 +130,10 @@ function describeAuditEvent(event) {
     detail = p.valid
       ? `Scorecard accepted (attempt ${p.attempt}).`
       : `Scorecard rejected (attempt ${p.attempt}): ${p.error || 'invalid reply'}`
+  } else if (event.event_type === 'DECISION') {
+    detail = p.decision
+      ? `${DECISION_LABELS[p.decision] || p.decision} by ${p.by || 'a recruiter'}.`
+      : `Decision cleared by ${p.by || 'a recruiter'}.`
   } else if (event.event_type === 'BUDGET_FREEZE') {
     detail = `AI paused: the $${p.ceiling_usd} monthly budget was reached.`
   } else {
@@ -149,6 +157,10 @@ function mapLiveCandidate(c, jobTitle) {
     scored,
     name: c.name || c.email,
     email: c.email,
+    invitedBy: c.invited_by,
+    decision: c.decision,
+    decidedBy: c.decided_by,
+    decidedAt: c.decided_at,
     role: jobTitle,
     aggregateScore: scored ? c.aggregate_score : 0,
     maxScore: 20,
@@ -178,6 +190,7 @@ function candidateSearchText(candidate) {
     candidate.email,
     `#${candidate.apiCandidateId}`,
     candidate.attempt ? `interview ${candidate.attempt}` : '',
+    candidate.decision || 'undecided',
     candidate.role,
     candidate.status,
     candidate.confidence,
@@ -419,6 +432,9 @@ function CandidateLeaderboardSection({
                 {candidate.email && candidate.email !== candidate.name ? candidate.email : `#${candidate.apiCandidateId}`}
                 {candidate.attempt ? ` - interview ${candidate.attempt} of ${candidate.attempts}` : ''}
               </p>
+              {candidate.decision ? (
+                <span className={`decision-badge ${candidate.decision}`}>{DECISION_LABELS[candidate.decision]}</span>
+              ) : null}
             </div>
             <span className="score-pill" role="cell">{formatAggregate(candidate)}</span>
             <span className="tabout-pill" role="cell">{candidate.tabOuts}</span>
@@ -506,7 +522,7 @@ function ProjectOverviewSection({ projects, boards, selectedJobId, onOpenProject
   )
 }
 
-function CandidateDetailDrawer({ candidate, onClose }) {
+function CandidateDetailDrawer({ candidate, onClose, onDecide, deciding }) {
   if (!candidate) {
     return null
   }
@@ -533,6 +549,42 @@ function CandidateDetailDrawer({ candidate, onClose }) {
             <p>{candidate.role} - aggregate {formatAggregate(candidate)}</p>
           </div>
         </header>
+
+        <section className="decision-panel" aria-label="Your decision">
+          <div>
+            <strong>Your decision</strong>
+            <p>
+              {candidate.decision
+                ? `${DECISION_LABELS[candidate.decision]}${candidate.decidedBy ? ` by ${candidate.decidedBy}` : ''}${candidate.decidedAt ? ` - ${new Date(candidate.decidedAt).toLocaleString()}` : ''}`
+                : 'Not decided yet. The AI score is a suggestion - the decision is yours.'}
+            </p>
+            {candidate.invitedBy ? <small>Invited by {candidate.invitedBy}</small> : null}
+            {candidate.decisionError ? <small className="decision-error">{candidate.decisionError}</small> : null}
+          </div>
+          <div className="decision-actions">
+            <button
+              type="button"
+              className={candidate.decision === 'shortlisted' ? 'decision-button shortlist active' : 'decision-button shortlist'}
+              onClick={() => onDecide(candidate, 'shortlisted')}
+              disabled={deciding || candidate.decision === 'shortlisted'}
+            >
+              <Icon name="check" size={16} /> Shortlist
+            </button>
+            <button
+              type="button"
+              className={candidate.decision === 'rejected' ? 'decision-button reject active' : 'decision-button reject'}
+              onClick={() => onDecide(candidate, 'rejected')}
+              disabled={deciding || candidate.decision === 'rejected'}
+            >
+              <Icon name="close" size={16} /> Reject
+            </button>
+            {candidate.decision ? (
+              <button type="button" className="text-link" onClick={() => onDecide(candidate, null)} disabled={deciding}>
+                Clear decision
+              </button>
+            ) : null}
+          </div>
+        </section>
 
         <div className="drawer-summary-grid" aria-label="Candidate review summary">
           <article className="drawer-summary-card">
@@ -673,6 +725,7 @@ export default function CompanyDashboard({
   const [loadState, setLoadState] = useState({ loading: true, error: '' })
   const [reloadKey, setReloadKey] = useState(0)
   const [budget, setBudget] = useState(null)
+  const [deciding, setDeciding] = useState(false)
   const signedIn = hasSession()
   const [forbidden, setForbidden] = useState(false) // server said 403: not a recruiter session
   const roleMismatch = signedIn && sessionRole && sessionRole !== 'company' // e.g. a candidate session
@@ -786,6 +839,32 @@ export default function CompanyDashboard({
       setSelectedCandidate(mapLiveDetail(candidate, detail, audit))
     } catch (error) {
       setSelectedCandidate({ ...candidate, loading: false, detailError: error.message })
+    }
+  }
+
+  // Record the recruiter's decision, then reload the drawer (incl. audit trail) and list.
+  const handleDecide = async (candidate, decision) => {
+    setDeciding(true)
+    try {
+      const res = await setCandidateDecision(candidate.apiCandidateId, decision)
+      const updated = {
+        ...candidate,
+        decision: res.decision,
+        decidedBy: res.decided_by,
+        decidedAt: res.decided_at,
+        decisionError: '',
+      }
+      setLiveLeaderboards((boards) => Object.fromEntries(Object.entries(boards).map(([key, list]) => [
+        key,
+        list.map((item) => (item.apiCandidateId === updated.apiCandidateId
+          ? { ...item, decision: updated.decision, decidedBy: updated.decidedBy, decidedAt: updated.decidedAt }
+          : item)),
+      ])))
+      await handleReviewCandidate(updated)
+    } catch (error) {
+      setSelectedCandidate((current) => (current ? { ...current, decisionError: `Could not save: ${error.message}` } : current))
+    } finally {
+      setDeciding(false)
     }
   }
 
@@ -1038,7 +1117,12 @@ export default function CompanyDashboard({
         {renderBody()}
       </section>
 
-      <CandidateDetailDrawer candidate={selectedCandidate} onClose={() => setSelectedCandidate(null)} />
+      <CandidateDetailDrawer
+        candidate={selectedCandidate}
+        onClose={() => setSelectedCandidate(null)}
+        onDecide={handleDecide}
+        deciding={deciding}
+      />
     </main>
   )
 }

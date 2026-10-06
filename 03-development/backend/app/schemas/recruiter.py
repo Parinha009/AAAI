@@ -67,6 +67,11 @@ class CandidateInfo(BaseModel):
     email: str
     status: str
     consent_at: datetime | None
+    # v1.1 additions
+    invited_by: str | None = None
+    decision: str | None = None  # shortlisted | rejected | null
+    decided_at: datetime | None = None
+    decided_by: str | None = None
 
 
 class JobInfo(BaseModel):
@@ -116,6 +121,11 @@ class JobCandidate(BaseModel):
     tab_out_count: int
     needs_review: bool
     review_reasons: list[str]
+    # v1.1 additions
+    invited_by: str | None = None
+    decision: str | None = None
+    decided_at: datetime | None = None
+    decided_by: str | None = None
 
 
 class JobCandidatesResponse(BaseModel):
@@ -135,3 +145,15 @@ class AuditEvent(BaseModel):
 class AuditTrailResponse(BaseModel):
     candidate_id: int
     events: list[AuditEvent]
+
+
+# --- PUT /candidates/{id}/decision (v1.1) — the human decision -------------
+class DecisionRequest(BaseModel):
+    decision: str | None = Field(None, description="'shortlisted', 'rejected', or null to clear")
+
+
+class DecisionResponse(BaseModel):
+    candidate_id: int
+    decision: str | None
+    decided_at: datetime | None
+    decided_by: str | None

@@ -39,6 +39,9 @@ class MeResponse(BaseModel):
     # the invite form (null if they left it blank).
     name: str | None = None
     email: str | None = None
+    # v1.1 (candidates): the recruiter who sent the invite, and the job's title.
+    invited_by: str | None = None
+    job_title: str | None = None
     candidate_id: int | None = None
     job_id: int | None = None
     candidate_status: str | None = None

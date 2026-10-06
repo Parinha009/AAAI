@@ -23,7 +23,7 @@ class AuditLog(TimestampMixin, Base):
     __tablename__ = "auditlogs"
     __table_args__ = (
         CheckConstraint(
-            "event_type IN ('CONSENT','AI_REQUEST','AI_RESPONSE','TAB_OUT','BUDGET_FREEZE')",
+            "event_type IN ('CONSENT','AI_REQUEST','AI_RESPONSE','TAB_OUT','BUDGET_FREEZE','DECISION')",
             name="ck_auditlogs_event_type",
         ),
         Index("ix_auditlogs_candidate_created", "candidate_id", "created_at"),

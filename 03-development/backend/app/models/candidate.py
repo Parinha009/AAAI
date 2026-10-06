@@ -25,6 +25,9 @@ class Candidate(TimestampMixin, Base):
             "status IN ('invited','consented','in_progress','completed','expired')",
             name="ck_candidates_status",
         ),
+        CheckConstraint(
+            "decision IS NULL OR decision IN ('shortlisted','rejected')", name="ck_candidates_decision"
+        ),
     )
 
     candidate_id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -39,6 +42,16 @@ class Candidate(TimestampMixin, Base):
     # This interview's random draw from the job's question bank: ordered question_ids
     # (FR-05). Null until the candidate first loads the questions.
     assigned_questions: Mapped[list | None] = mapped_column(JSONB)
+    # Who sent the invite (shown to the candidate as "Invited by ...").
+    invited_by_recruiter_id: Mapped[int | None] = mapped_column(
+        ForeignKey("recruiters.recruiter_id", name="fk_candidates_invited_by")
+    )
+    # The human decision - AI suggests, people decide. Never shown to the candidate.
+    decision: Mapped[str | None] = mapped_column(String(12))  # shortlisted | rejected
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    decided_by_recruiter_id: Mapped[int | None] = mapped_column(
+        ForeignKey("recruiters.recruiter_id", name="fk_candidates_decided_by")
+    )
 
     job: Mapped[Job] = relationship(back_populates="candidates")
     responses: Mapped[list[Response]] = relationship(back_populates="candidate")

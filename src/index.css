@@ -7299,3 +7299,70 @@ img {
 @media (max-width: 560px) {
   .lx-footer-top { grid-template-columns: 1fr; }
 }
+
+/* Recruiter decision (AI suggests, people decide) */
+.decision-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 4px 0 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-blue);
+}
+
+.decision-panel strong { color: var(--text); }
+.decision-panel p { margin: 4px 0 0; color: var(--muted); font-size: 0.9rem; }
+.decision-panel small { display: block; margin-top: 4px; color: var(--subtle); font-size: 0.8rem; }
+.decision-panel .decision-error { color: var(--error); }
+
+.decision-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.decision-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.decision-button:disabled { cursor: default; opacity: 0.85; }
+.decision-button.shortlist:hover:not(:disabled) { border-color: var(--success); color: var(--success); }
+.decision-button.reject:hover:not(:disabled) { border-color: var(--error); color: var(--error); }
+.decision-button.shortlist.active { color: #fff; background: var(--success); border-color: var(--success); }
+.decision-button.reject.active { color: #fff; background: var(--error); border-color: var(--error); }
+
+.decision-badge {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.decision-badge.shortlisted { color: var(--success); background: var(--success-soft); }
+.decision-badge.rejected { color: var(--error); background: var(--error-soft); }
+
+/* Candidate page: who invited them */
+.invited-by-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--muted);
+}

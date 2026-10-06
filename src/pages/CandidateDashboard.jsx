@@ -843,6 +843,13 @@ export default function CandidateDashboard({
             <span>{card.eyebrow}</span>
           </div>
           <h2>{card.title}</h2>
+          <p className="invited-by-line">
+            <Icon name="users" size={16} />
+            <span>
+              Invited by <strong>{profile.invitedBy || 'the hiring team'}</strong>
+              {profile.jobTitle ? <> for <strong>{profile.jobTitle}</strong></> : null}
+            </span>
+          </p>
           <p>{card.copy}</p>
           {card.action ? (
             <>

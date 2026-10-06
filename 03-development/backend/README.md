@@ -120,6 +120,7 @@ candidates are seeded; every score comes from the AI pipeline.
 | GET | `/api/v1/candidates/{id}` | Full drill-down: transcripts, scores, audio links (FR-14/15) | recruiter |
 | GET | `/api/v1/responses/{id}/audio` | Stream one recording for playback (FR-15) | recruiter + `play_audio` |
 | GET | `/api/v1/candidates/{id}/audit` | Read-only, chronological audit trail (contract #17, FR-13) | recruiter |
+| PUT | `/api/v1/candidates/{id}/decision` | **v1.1:** the human decision — `shortlisted` / `rejected` / `null`; each change is appended to the audit trail (`DECISION`) | recruiter + `decide_candidate` |
 | POST | `/api/v1/jobs/{id}/invite` | **v1.1:** invite a candidate by email — creates them + emails a magic link (FR-04) | recruiter + `invite_candidate` |
 | GET | `/api/v1/jobs/{id}/candidates` | **v1.1:** every candidate for a job (scored or not) + answer counts — feeds the dashboard (FR-14) | recruiter + `view_candidate` |
 
@@ -128,7 +129,10 @@ re-sends the link. Once it is `completed`/`expired`, a re-invite creates a **new
 (a new `candidate_id`; the response says `new_interview: true`). The old interview, its
 recordings and its append-only audit trail are kept, and signing in opens the newest one.
 
-> **Contract v1.1 note:** `GET /auth/me` now also returns optional `name` and `email` (a candidate's
+> **Contract v1.1 note:** migration `0004` adds `candidates.invited_by_recruiter_id`, `decision`,
+> `decided_at`, `decided_by_recruiter_id` and a `DECISION` audit event type; candidate payloads gain
+> `invited_by` / `decision` / `decided_by` / `decided_at`, and `/auth/me` gains `invited_by` + `job_title`.
+> `GET /auth/me` now also returns optional `name` and `email` (a candidate's
 > `name` is what the recruiter typed in the invite form). `POST /jobs/{id}/invite` and `GET /jobs/{id}/candidates` are *additions* to API Contract v1
 > (candidates are invited, never self-registered — SRS-2.3/FR-04; the leaderboard only lists
 > scored candidates, so the dashboard needs the full list). Log them with the Lead.

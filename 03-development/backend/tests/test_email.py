@@ -48,3 +48,40 @@ def test_enabled_without_host_raises(monkeypatch):
     monkeypatch.setattr(settings, "smtp_host", "")
     with pytest.raises(RuntimeError):
         email_mod.send_magic_link("x@y.com", "http://link")
+
+
+def test_brevo_api_is_used_when_key_is_set(monkeypatch):
+    """Hosts like Render's free plan block SMTP - the Brevo HTTPS API is used instead."""
+    import json as _json
+
+    from app import email as email_mod
+
+    monkeypatch.setattr(email_mod.settings, "email_enabled", True)
+    monkeypatch.setattr(email_mod.settings, "smtp_host", "smtp.gmail.com")
+    monkeypatch.setattr(email_mod.settings, "brevo_api_key", "xkeysib-test")
+    monkeypatch.setattr(email_mod.settings, "smtp_from", "AAAI <sender@gmail.com>")
+    sent = {}
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def read(self):
+            return b'{"messageId":"x"}'
+
+    def fake_urlopen(request, timeout):
+        sent["url"], sent["key"] = request.full_url, request.headers["Api-key"]
+        sent["body"] = _json.loads(request.data)
+        return FakeResponse()
+
+    monkeypatch.setattr(email_mod.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(email_mod.smtplib, "SMTP", lambda *a, **k: (_ for _ in ()).throw(AssertionError("SMTP used")))
+
+    email_mod.send_magic_link("person@gmail.com", "https://app/auth/callback?token=abc")
+    assert sent["url"] == email_mod.BREVO_URL and sent["key"] == "xkeysib-test"
+    assert sent["body"]["sender"] == {"name": "AAAI", "email": "sender@gmail.com"}
+    assert sent["body"]["to"] == [{"email": "person@gmail.com"}]
+    assert "token=abc" in sent["body"]["htmlContent"]

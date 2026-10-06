@@ -52,6 +52,10 @@ class Settings(BaseSettings):
     smtp_user: str = ""
     smtp_password: str = ""
     smtp_from: str = "AAAI <no-reply@aaai.local>"
+    # Optional: send through Brevo's HTTPS API instead of SMTP. Needed on hosts that
+    # block outgoing SMTP ports (e.g. Render's free plan). The sender address in
+    # SMTP_FROM must be a verified sender in Brevo.
+    brevo_api_key: str = ""
     smtp_use_tls: bool = True  # STARTTLS (port 587); set False for a plain local server
     smtp_use_ssl: bool = False  # implicit SSL (port 465)
 

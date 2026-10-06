@@ -1,14 +1,18 @@
 """Email delivery (SRS-3.3 Email Delivery Service).
 
-Sends the magic-link sign-in email over SMTP (Python stdlib — no extra dependency).
-When `email_enabled` is False (dev default) the link is logged instead of sent, so
-the flow stays testable without a mail server.
+Sends the magic-link sign-in email - over SMTP, or through Brevo's HTTPS API when
+BREVO_API_KEY is set (for hosts that block outgoing SMTP, like Render's free plan).
+Python stdlib only - no extra dependency. When `email_enabled` is False (dev
+default) the link is logged instead of sent, so the flow stays testable.
 """
 
+import json
 import logging
 import smtplib
 import ssl
+import urllib.request
 from email.message import EmailMessage
+from email.utils import parseaddr
 
 from app.config import settings
 
@@ -59,6 +63,10 @@ def send_magic_link(to_email: str, link: str) -> None:
         raise RuntimeError("email_enabled is True but SMTP_HOST is not configured")
 
     text, html = _bodies(link)
+    if settings.brevo_api_key:
+        _deliver_brevo(to_email, text, html)
+        return
+
     msg = EmailMessage()
     msg["Subject"] = _SUBJECT
     msg["From"] = settings.smtp_from
@@ -87,3 +95,31 @@ def _auth_and_send(server: smtplib.SMTP, msg: EmailMessage) -> None:
         server.login(settings.smtp_user, settings.smtp_password)
     server.send_message(msg)
     logger.info("Sent magic-link email to %s", msg["To"])
+
+
+BREVO_URL = "https://api.brevo.com/v3/smtp/email"
+
+
+def _deliver_brevo(to_email: str, text: str, html: str) -> None:
+    """Send through Brevo's transactional email API (HTTPS, port 443)."""
+    sender_name, sender_email = parseaddr(settings.smtp_from)
+    body = json.dumps({
+        "sender": {"name": sender_name or "AAAI", "email": sender_email},
+        "to": [{"email": to_email}],
+        "subject": _SUBJECT,
+        "textContent": text,
+        "htmlContent": html,
+    }).encode("utf-8")
+    request = urllib.request.Request(
+        BREVO_URL,
+        data=body,
+        method="POST",
+        headers={
+            "api-key": settings.brevo_api_key,
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        },
+    )
+    with urllib.request.urlopen(request, timeout=15) as response:  # raises on 4xx/5xx
+        response.read()
+    logger.info("Sent magic-link email to %s via Brevo", to_email)

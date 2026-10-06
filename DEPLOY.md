@@ -29,6 +29,16 @@ Render gives each service an address, e.g. `https://aaai-frontend.onrender.com` 
 - Open the frontend, Login -> Company / Recruiter -> your `SEED_REAL_EMAIL`, click the emailed link.
 - Invite yourself as a candidate and do one interview.
 
+## Email on Render's free plan (important)
+Render's free plan **blocks outgoing SMTP** (Gmail), so sign-in emails time out.
+Send them through **Brevo** (free, 300/day) instead:
+1. Sign up at https://www.brevo.com.
+2. **Senders, Domains & Dedicated IPs -> Senders -> Add a sender**: the address used in
+   `SMTP_FROM` (e.g. your Gmail). Confirm the email Brevo sends you.
+3. **SMTP & API -> API Keys -> Generate a new API key** (starts with `xkeysib-`).
+4. Render -> **aaai-backend -> Environment -> Add variable** `BREVO_API_KEY` = that key -> Save.
+With `BREVO_API_KEY` set the backend uses Brevo; without it, it uses SMTP (fine locally).
+
 ## Know before the demo
 - **Free plan sleeps** after ~15 minutes idle; the first request then takes ~30-60 s.
   Open the site a minute before presenting.

@@ -7452,3 +7452,17 @@ img {
 @media (max-width: 560px) {
   .lx-footer-top { grid-template-columns: 1fr; }
 }
+
+/* Footer bottom bar: divider spans the full width, texts sit in the far corners */
+.lx-footer {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.lx-footer-top {
+  padding: 0 max(24px, calc((100% - 1200px) / 2)); /* top part stays on the page column */
+}
+
+.lx-footer-bottom {
+  padding: 18px clamp(20px, 2.5vw, 36px) 0;
+}

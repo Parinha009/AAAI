@@ -1,6 +1,6 @@
 # AAAI — Automated Asynchronous AI Interviewer
 
-A **website** where a job candidate completes an interview by speaking to their computer — no live interviewer, no video call. The system records the answers, transcribes them, asks one AI-generated follow-up question, and produces a scorecard. A recruiter then signs in and reviews a ranked leaderboard.
+A **website** where a job candidate completes an interview by speaking to their computer — no live interviewer, no video call. The system records the answers, transcribes them, and produces a scorecard. A recruiter then signs in, reviews a ranked leaderboard (transcripts, recordings, review flags) and makes the decision.
 
 University capstone project · 11 weeks (22 Jun → 07 Oct 2026) · 4-person team.
 
@@ -11,7 +11,7 @@ University capstone project · 11 weeks (22 Jun → 07 Oct 2026) · 4-person tea
 | Role | Person | Lane |
 |---|---|---|
 | Project Lead | Thaing Parinha | Contract, rubric, prompts, QA, delivery |
-| Frontend | Soeng Senghorng | React + Tailwind — candidate screens & recruiter dashboard |
+| Frontend | Soeng Senghorng | React + plain CSS — candidate screens & recruiter dashboard |
 | Backend | Lim Hokan | FastAPI + PostgreSQL — API routes, schema, audit logs |
 | AI / Infrastructure | Uy Sovannareach | OpenAI (Whisper + GPT-4o-mini), hosting, cost guards |
 
@@ -19,11 +19,13 @@ University capstone project · 11 weeks (22 Jun → 07 Oct 2026) · 4-person tea
 
 ## How it works (the flow)
 
-Magic-link invite → consent → 3–5 base questions under one 5:00 timer (voice) → upload & Whisper transcription → one AI follow-up under a 2:30 timer → GPT-4o-mini scorecard (4 traits, 1–5) → recruiter leaderboard.
+Recruiter invites by email (magic link) → consent + microphone check → 5 questions drawn at random from the job's bank, 2:00 each, count hidden from the candidate (voice) → upload & Whisper transcription → GPT-4o-mini scorecard (4 traits, 1–5, rationale, robotic-language cap) → recruiter leaderboard → human Shortlist / Reject.
+
+12 hiring projects ship with the seed, each with a 12-question bank and rubric. The AI follow-up question from the original SRS (FR-08/09) was removed by product decision — see `03-development/backend/README.md` for every v1.1 change.
 
 **Messenger vs. Brain:** our code (React + FastAPI + PostgreSQL) is the *Messenger* — it runs screens, timers, and storage. OpenAI is the *Brain* — all transcription and judgement. We orchestrate; we don't build models.
 
-**Tech:** React · Tailwind CSS · FastAPI (Python) · PostgreSQL · OpenAI Whisper-1 + GPT-4o-mini
+**Tech:** React (Vite, plain CSS) · FastAPI (Python) · PostgreSQL · OpenAI Whisper-1 + GPT-4o-mini
 
 ---
 

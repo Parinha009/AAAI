@@ -13,7 +13,7 @@ Five core tables, all foreign-keyed for relational integrity:
 
 | Table | Purpose | Key refs |
 |-------|---------|----------|
-| `jobs` | Role config: base questions, rubric/follow-up prompts | — |
+| `jobs` | Role config: question bank (12 per job), rubric | — |
 | `candidates` | Invited person + consent record (FR-01) | `job_id → jobs` |
 | `responses` | One recorded answer + transcript (FR-06/07) | `candidate_id`, `job_id` |
 | `scores` | Structured 4-trait scorecard 1–5 (FR-03) | `candidate_id` (unique), `job_id` |
@@ -67,12 +67,12 @@ docker compose up -d db
 pytest
 ```
 
-44 tests cover: auth (magic-link, verify, single-use, anti-enumeration), the consent
+49 tests cover: auth (magic-link, verify, single-use, anti-enumeration), the consent
 gate (403 → 201 → 200), audio upload validation (201 / 413 / 415), tab-out logging +
 audit-log immutability, RBAC on `budget-status`, the budget kill-switch guard, the
 recruiter dashboard (jobs, ranked leaderboard, candidate detail, audio playback), and
 email delivery (dev-log fallback + the SMTP send path), and the AI pipeline (transcription,
-no-speech handling, exactly-one follow-up, JSON scoring + corrective retry + manual-review
+no-speech + hallucination handling, random per-interview questions, finish -> scoring, JSON scoring + corrective retry + manual-review
 fallback, robotic-language down-weighting, budget freeze, audit trail).
 
 ## API routes — aligned to **API Contract v1**
@@ -140,7 +140,7 @@ recordings and its append-only audit trail are kept, and signing in opens the ne
 **IDs are integers** (`job_id`, `candidate_id`, `response_id` …) per the contract.
 
 **Audio upload:** `multipart/form-data` with `audio` (webm/mp4/wav/m4a, ≤20 MB),
-`question_id` (0 = follow-up), and `type` (`base`/`follow_up`). Oversized → **413**
+`question_id` (one of this interview's drawn questions), and `type` (`base`). Oversized → **413**
 (never persisted); bad type → **415**. Only the file *path* is stored (audio lives
 under `media/<candidate_id>/`). Upload returns `status: "transcribing"`; the frontend
 polls `GET /responses/{id}` until final.
@@ -227,7 +227,7 @@ Every call is budget-guarded and charged (FR-16) and logged verbatim to `auditlo
 **Provider:** `AI_PROVIDER=auto` picks OpenAI if `OPENAI_API_KEY` is set, else **Groq** if
 `GROQ_API_KEY` is set, else a clearly-labelled `[Simulated]` provider. Tests always simulate.
 
-| Provider | Transcription | Follow-up + scoring | Cost |
+| Provider | Transcription | Scoring | Cost |
 |---|---|---|---|
 | OpenAI (SRS §2.5) | `whisper-1` | `gpt-4o-mini` | ~$0.03 / interview, charged to the FR-16 budget |
 | Groq (free tier) | `whisper-large-v3-turbo` | `llama-3.3-70b-versatile` | $0 - nothing charged; free-tier rate limits apply |

@@ -10,6 +10,7 @@ import json
 import logging
 import smtplib
 import ssl
+import urllib.error
 import urllib.request
 from email.message import EmailMessage
 from email.utils import parseaddr
@@ -120,6 +121,11 @@ def _deliver_brevo(to_email: str, text: str, html: str) -> None:
             "Accept": "application/json",
         },
     )
-    with urllib.request.urlopen(request, timeout=15) as response:  # raises on 4xx/5xx
-        response.read()
+    try:
+        with urllib.request.urlopen(request, timeout=15) as response:
+            response.read()
+    except urllib.error.HTTPError as exc:
+        # Keep Brevo's explanation (e.g. "account not activated", "sender not valid").
+        detail = exc.read().decode("utf-8", "replace")[:500]
+        raise RuntimeError(f"Brevo refused the email (HTTP {exc.code}): {detail}") from exc
     logger.info("Sent magic-link email to %s via Brevo", to_email)

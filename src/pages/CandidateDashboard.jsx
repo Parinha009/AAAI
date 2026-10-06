@@ -706,6 +706,15 @@ function InterviewWorkspace({ candidateName, onClose }) {
                 <dt>Tab outs</dt>
                 <dd>{tabOutCount}</dd>
               </div>
+              <div>
+                <dt>Time taken</dt>
+                <dd>
+                  {formatTime(baseQuestions.reduce(
+                    (sum, question) => sum + (questionSeconds - (timeLeft[question.id] ?? questionSeconds)),
+                    0,
+                  ))}
+                </dd>
+              </div>
             </dl>
             <button type="button" className="solid-button" onClick={onClose}>
               Return to dashboard

@@ -4,6 +4,7 @@ Secrets (DATABASE_URL, OPENAI_API_KEY) are read from the environment only and
 never hard-coded, so nothing sensitive lives in source control.
 """
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -15,6 +16,16 @@ class Settings(BaseSettings):
     )
 
     database_url: str
+
+    @field_validator("database_url")
+    @classmethod
+    def _use_psycopg_driver(cls, url: str) -> str:
+        """Hosts (Render, Railway, Heroku) give postgres:// or postgresql:// URLs;
+        SQLAlchemy needs the psycopg 3 driver named explicitly."""
+        for prefix in ("postgres://", "postgresql://"):
+            if url.startswith(prefix):
+                return "postgresql+psycopg://" + url[len(prefix):]
+        return url
     app_name: str = "AAAI Backend"
     environment: str = "development"
 

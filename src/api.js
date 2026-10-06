@@ -1,6 +1,7 @@
 // Client for the AAAI backend auth API (passwordless magic-link, FR-04).
-// Backend runs at 127.0.0.1:8000; CORS allows the Vite dev origin.
-const API_ORIGIN = 'http://127.0.0.1:8000'
+// Where the backend lives. Set VITE_API_URL when building for a deployment
+// (e.g. https://aaai-backend.onrender.com); local dev falls back to 127.0.0.1:8000.
+const API_ORIGIN = (import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000').replace(/\/+$/, '')
 const API_BASE = `${API_ORIGIN}/api/v1`
 
 async function parse(res) {

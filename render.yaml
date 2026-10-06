@@ -1,0 +1,65 @@
+# Render Blueprint - deploys AAAI in one go: Postgres + FastAPI backend + React site.
+# Render dashboard -> New -> Blueprint -> pick this repo. Fill the "sync: false"
+# secrets when prompted. Full walkthrough: DEPLOY.md.
+databases:
+  - name: aaai-db
+    plan: free
+    databaseName: aaai
+    user: aaai
+
+services:
+  - type: web
+    name: aaai-backend
+    runtime: python
+    plan: free
+    rootDir: 03-development/backend
+    buildCommand: pip install -r requirements.txt
+    # Migrations + idempotent seed (jobs, rubric, your recruiter) on every start.
+    startCommand: alembic upgrade head && python -m app.seed && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: DATABASE_URL
+        fromDatabase:
+          name: aaai-db
+          property: connectionString
+      - key: ENVIRONMENT
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: FRONTEND_BASE_URL   # the website address - used in emailed sign-in links
+        sync: false
+      - key: CORS_ORIGINS        # same website address
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: SEED_REAL_EMAIL     # your recruiter email
+        sync: false
+      - key: EMAIL_ENABLED
+        value: "true"
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD       # Gmail App Password
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+
+  - type: web
+    name: aaai-frontend
+    runtime: static
+    rootDir: .
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_URL        # the backend address, e.g. https://aaai-backend.onrender.com
+        sync: false
+    routes:
+      # Single-page app: /auth/callback?token=... (emailed links) must load index.html
+      - type: rewrite
+        source: /*
+        destination: /index.html

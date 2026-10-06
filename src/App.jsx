@@ -266,9 +266,20 @@ export default function App() {
     showToast('success', 'Logged out', `${name} has been signed out.`)
   }
 
+  // Signed out, then straight to the sign-in page for the other account type.
+  const handleSwitchAccount = (role) => {
+    storage.remove(SESSION_KEY)
+    storage.remove(PROFILE_KEY)
+    setCurrentUser(null)
+    setCurrentRole('candidate')
+    openLogin({ role })
+    showToast('info', 'Signed out', `Enter your ${role === 'company' ? 'recruiter' : 'candidate'} email to get a sign-in link.`)
+  }
+
+  // The dashboard follows the page the user picked; the role always comes from the
+  // session (never from the button), so each dashboard can spot a mismatch.
   const handleChooseCompany = () => {
     if (currentUser) {
-      setCurrentRole('company')
       setMode('company')
       return
     }
@@ -278,7 +289,6 @@ export default function App() {
 
   const handleChooseCandidate = () => {
     if (currentUser) {
-      setCurrentRole('candidate')
       setMode('candidate')
       return
     }
@@ -323,6 +333,13 @@ export default function App() {
           onBackToLanding={handleGoLanding}
           onLogout={handleLogout}
           onOpenLogin={() => openLogin({ role: 'company' })}
+          sessionRole={currentUser ? currentRole : null}
+          onOpenOwnDashboard={(role) => {
+            // role = what the server says this session is; keep App in sync with it
+            if (role) setCurrentRole(role)
+            setMode(role || currentRole)
+          }}
+          onSwitchAccount={() => handleSwitchAccount('company')}
         />
       ) : mode === 'candidate' ? (
         <CandidateDashboard
@@ -330,6 +347,13 @@ export default function App() {
           onBackToLanding={handleGoLanding}
           onLogout={handleLogout}
           onOpenLogin={() => openLogin({ role: 'candidate' })}
+          sessionRole={currentUser ? currentRole : null}
+          onOpenOwnDashboard={(role) => {
+            // role = what the server says this session is; keep App in sync with it
+            if (role) setCurrentRole(role)
+            setMode(role || currentRole)
+          }}
+          onSwitchAccount={() => handleSwitchAccount('candidate')}
         />
       ) : (
         <Landing

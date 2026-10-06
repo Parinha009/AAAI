@@ -6,7 +6,10 @@ const API_BASE = `${API_ORIGIN}/api/v1`
 async function parse(res) {
   const data = await res.json().catch(() => null)
   if (!res.ok) {
-    throw new Error(data?.error?.message || `Request failed (${res.status})`)
+    const error = new Error(data?.error?.message || `Request failed (${res.status})`)
+    error.status = res.status // e.g. 403 = this session's role can't use this route
+    error.code = data?.error?.code
+    throw error
   }
   return data
 }

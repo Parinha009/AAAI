@@ -10,6 +10,7 @@ import {
   listJobs,
 } from '../api'
 import Icon from '../components/Icon'
+import RoleMismatch from '../components/RoleMismatch'
 
 // Recruiter pages. Everything shown comes from the backend - there is no mock data.
 const interviewPages = [
@@ -659,7 +660,9 @@ function sortCandidates(list) {
     .map((candidate, index) => ({ ...candidate, rank: index + 1 }))
 }
 
-export default function CompanyDashboard({ user, onBackToLanding, onOpenLogin, onLogout }) {
+export default function CompanyDashboard({
+  user, onBackToLanding, onOpenLogin, onLogout, sessionRole, onOpenOwnDashboard, onSwitchAccount,
+}) {
   const [activeMenu, setActiveMenu] = useState('')
   const [activeInterviewPage, setActiveInterviewPage] = useState('dashboard')
   const [selectedJobId, setSelectedJobId] = useState('')
@@ -671,6 +674,9 @@ export default function CompanyDashboard({ user, onBackToLanding, onOpenLogin, o
   const [reloadKey, setReloadKey] = useState(0)
   const [budget, setBudget] = useState(null)
   const signedIn = hasSession()
+  const [forbidden, setForbidden] = useState(false) // server said 403: not a recruiter session
+  const roleMismatch = signedIn && sessionRole && sessionRole !== 'company' // e.g. a candidate session
+  const wrongRole = roleMismatch || forbidden
   const profile = user || { name: 'Recruiter', email: '' }
   const initial = (profile.name || 'R').charAt(0).toUpperCase()
   const project = liveProjects.find((item) => item.jobId === selectedJobId) || liveProjects[0] || null
@@ -695,7 +701,7 @@ export default function CompanyDashboard({ user, onBackToLanding, onOpenLogin, o
 
   // FR-14: jobs + every candidate, straight from the backend.
   useEffect(() => {
-    if (!signedIn) {
+    if (!signedIn || roleMismatch) {
       setLoadState({ loading: false, error: '' })
       return undefined
     }
@@ -727,17 +733,23 @@ export default function CompanyDashboard({ user, onBackToLanding, onOpenLogin, o
         setSelectedJobId((current) => (liveList.some((item) => item.jobId === current) ? current : liveList[0]?.jobId || ''))
         setLoadState({ loading: false, error: '' })
       } catch (error) {
-        if (!cancelled) setLoadState({ loading: false, error: error.message })
+        if (cancelled) return
+        if (error.status === 403) {
+          setForbidden(true)
+          setLoadState({ loading: false, error: '' })
+        } else {
+          setLoadState({ loading: false, error: error.message })
+        }
       }
     })()
     return () => {
       cancelled = true
     }
-  }, [signedIn, reloadKey])
+  }, [signedIn, roleMismatch, reloadKey])
 
   // FR-16: poll the budget so the "AI paused" banner appears without a reload.
   useEffect(() => {
-    if (!signedIn) {
+    if (!signedIn || wrongRole) {
       return undefined
     }
     let cancelled = false
@@ -750,7 +762,7 @@ export default function CompanyDashboard({ user, onBackToLanding, onOpenLogin, o
       cancelled = true
       window.clearInterval(intervalId)
     }
-  }, [signedIn])
+  }, [signedIn, wrongRole])
 
   const refresh = () => setReloadKey((key) => key + 1)
 
@@ -788,6 +800,16 @@ export default function CompanyDashboard({ user, onBackToLanding, onOpenLogin, o
   }
 
   const renderBody = () => {
+    if (wrongRole) {
+      return (
+        <RoleMismatch
+          sessionRole={sessionRole && sessionRole !== 'company' ? sessionRole : 'candidate'}
+          pageRole="company"
+          onOpenOwnDashboard={onOpenOwnDashboard}
+          onSwitchAccount={onSwitchAccount}
+        />
+      )
+    }
     if (!signedIn) {
       return (
         <section className="dashboard-card">
@@ -977,7 +999,7 @@ export default function CompanyDashboard({ user, onBackToLanding, onOpenLogin, o
             <p>Review AI-scored interviews, recordings and flags for each hiring project.</p>
           </div>
 
-          {signedIn ? (
+          {signedIn && !wrongRole ? (
             <div className="company-workspace-actions">
               {liveProjects.length > 1 && project ? (
                 <label className="company-job-select" htmlFor="headerJob">

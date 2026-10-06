@@ -6882,3 +6882,45 @@ img {
   .cj-steps { grid-template-columns: 1fr; }
   .cj-step { grid-template-columns: auto 1fr; align-items: center; }
 }
+
+/* Signed in with the other account type (recruiter on the candidate page, or vice versa) */
+.role-mismatch {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+  padding: clamp(24px, 4vw, 40px);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.role-mismatch h2 {
+  margin: 0;
+  font-size: clamp(1.4rem, 2.6vw, 1.9rem);
+  color: var(--charcoal);
+}
+
+.role-mismatch p {
+  margin: 0;
+  max-width: 560px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.role-mismatch-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.role-mismatch-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 4px;
+}

@@ -9,6 +9,7 @@ import {
   uploadResponse,
 } from '../api'
 import Icon from '../components/Icon'
+import RoleMismatch from '../components/RoleMismatch'
 
 const BASE_ROUND_SECONDS = 300
 const FOLLOW_UP_SECONDS = 150
@@ -901,8 +902,10 @@ function JourneySteps({ current }) {
   )
 }
 
-export default function CandidateDashboard({ user, onOpenLogin, onBackToLanding, onLogout }) {
-  const [interview, setInterview] = useState({ loading: true, error: '', status: null })
+export default function CandidateDashboard({
+  user, onOpenLogin, onBackToLanding, onLogout, sessionRole, onOpenOwnDashboard, onSwitchAccount,
+}) {
+  const [interview, setInterview] = useState({ loading: true, error: '', status: null, forbidden: false })
   const [isInterviewOpen, setIsInterviewOpen] = useState(false)
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
@@ -911,21 +914,28 @@ export default function CandidateDashboard({ user, onOpenLogin, onBackToLanding,
   const displayName = firstName.charAt(0).toUpperCase() + firstName.slice(1)
   const initial = displayName.charAt(0)
   const signedIn = hasSession()
+  const roleMismatch = signedIn && sessionRole && sessionRole !== 'candidate' // e.g. a recruiter session
+  // Also trust the server: /interview/status answers 403 to a non-candidate session.
+  const wrongRole = roleMismatch || interview.forbidden
 
   useEffect(() => {
-    if (!signedIn) {
-      setInterview({ loading: false, error: '', status: null })
+    if (!signedIn || roleMismatch) {
+      setInterview({ loading: false, error: '', status: null, forbidden: false })
       return undefined
     }
     let cancelled = false
     setInterview((current) => ({ ...current, loading: true, error: '' }))
     getInterviewStatus()
-      .then((status) => { if (!cancelled) setInterview({ loading: false, error: '', status }) })
-      .catch((error) => { if (!cancelled) setInterview({ loading: false, error: error.message, status: null }) })
+      .then((status) => { if (!cancelled) setInterview({ loading: false, error: '', status, forbidden: false }) })
+      .catch((error) => {
+        if (!cancelled) {
+          setInterview({ loading: false, error: error.message, status: null, forbidden: error.status === 403 })
+        }
+      })
     return () => {
       cancelled = true
     }
-  }, [signedIn, reloadKey])
+  }, [signedIn, roleMismatch, reloadKey])
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -943,6 +953,16 @@ export default function CandidateDashboard({ user, onOpenLogin, onBackToLanding,
   const finished = view && view.step >= 3
 
   const renderHero = () => {
+    if (wrongRole) {
+      return (
+        <RoleMismatch
+          sessionRole={sessionRole && sessionRole !== 'candidate' ? sessionRole : 'company'}
+          pageRole="candidate"
+          onOpenOwnDashboard={onOpenOwnDashboard}
+          onSwitchAccount={onSwitchAccount}
+        />
+      )
+    }
     if (!signedIn) {
       return (
         <section className="cj-hero">
@@ -1106,6 +1126,7 @@ export default function CandidateDashboard({ user, onOpenLogin, onBackToLanding,
           </section>
         ) : null}
 
+        {wrongRole ? null : (
         <section className="cj-section" aria-labelledby="cj-faq-title">
           <h2 id="cj-faq-title">Good to know</h2>
           <div className="cj-faq">
@@ -1117,6 +1138,7 @@ export default function CandidateDashboard({ user, onOpenLogin, onBackToLanding,
             ))}
           </div>
         </section>
+        )}
 
         <p className="cj-privacy">
           <Icon name="shield" size={16} /> Your recordings are only shared with the hiring team for this job.

@@ -169,3 +169,10 @@ def test_reinvite_after_completed_interview_starts_a_new_one(client, job_id, rec
     # both interviews stay visible to the recruiter
     ids = {c["candidate_id"] for c in client.get(f"{API}/jobs/{job_id}/candidates", headers=recruiter_headers).json()["candidates"]}
     assert {first_id, body["candidate_id"]} <= ids
+
+
+def test_wrong_account_type_gets_403(client, recruiter_headers, candidate_headers):
+    """The dashboards rely on this: a recruiter session on candidate routes (and vice
+    versa) is refused with 403, which the UI turns into a 'signed in as...' screen."""
+    assert client.get(f"{API}/interview/status", headers=recruiter_headers).status_code == 403
+    assert client.get(f"{API}/jobs", headers=candidate_headers).status_code == 403

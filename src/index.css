@@ -7382,3 +7382,73 @@ img {
 }
 
 .completed-cell strong { white-space: nowrap; }
+
+/* Footer: square edges, and type/spacing matched to the landing sections */
+.lx-footer {
+  border-radius: 0;
+  padding-top: 72px;
+  padding-bottom: 32px;
+}
+
+.lx-footer-top {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  column-gap: clamp(40px, 7vw, 96px);
+  align-items: start;
+  min-height: 0;
+}
+
+.lx-wordmark {
+  font-size: clamp(2.8rem, 6vw, 4.6rem); /* in line with "Core Capabilities" / "FAQs" */
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.lx-footer-brand p {
+  max-width: 420px;
+  margin-top: 14px;
+  font-size: 0.98rem; /* same as section intro copy */
+  line-height: 1.55;
+}
+
+.lx-footer-col {
+  gap: 12px;
+  min-width: 160px;
+}
+
+.lx-footer-col h3 {
+  margin: 6px 0 4px;
+  color: #9fb8ff; /* the page's eyebrow style, on dark */
+  font-size: 0.75rem;
+  font-weight: 760;
+  letter-spacing: 0.14em;
+}
+
+.lx-footer-col button {
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.lx-footer-col span {
+  gap: 2px;
+  font-size: 0.95rem;
+}
+
+.lx-footer-col small {
+  font-size: 0.82rem;
+}
+
+.lx-footer-bottom {
+  margin-top: 56px;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 900px) {
+  .lx-footer-top { grid-template-columns: 1fr 1fr; row-gap: 36px; }
+  .lx-footer-brand { grid-column: 1 / -1; }
+}
+
+@media (max-width: 560px) {
+  .lx-footer-top { grid-template-columns: 1fr; }
+}
